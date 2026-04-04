@@ -1,4 +1,4 @@
-import { AppRoutes } from "./routes";
+import { AppRoutes } from "../src/app/routes";
 import "./app.scss";
 import "../src/shared/styles/global.scss";
 

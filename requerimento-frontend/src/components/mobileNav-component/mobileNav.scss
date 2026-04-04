@@ -1,0 +1,47 @@
+@use "../../shared/styles/variables" as *;
+@use "../../shared/styles/mixins" as *;
+
+.mobile-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 60;
+  border-top: 1px solid $color-border;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(8px);
+
+  @media (min-width: 1024px) {
+    display: none;
+  }
+}
+
+.mobile-nav__container {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  min-height: 64px;
+}
+
+.mobile-nav__link {
+  @include flex-center;
+  flex-direction: column;
+  gap: 4px;
+  color: $color-text-light;
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+
+  &:hover {
+    color: $color-primary;
+  }
+}
+
+.mobile-nav__link--active {
+  color: $color-primary;
+  font-weight: 600;
+}
+
+.mobile-nav__label {
+  line-height: 1;
+}
