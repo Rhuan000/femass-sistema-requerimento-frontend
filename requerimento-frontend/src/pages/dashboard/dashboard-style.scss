@@ -1,0 +1,268 @@
+@use "../../shared/styles/variables" as *;
+
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.dashboard__header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dashboard__title {
+  &.MuiTypography-root {
+    margin: 0;
+    font-weight: 700;
+    color: $color-text;
+  }
+}
+
+.dashboard__subtitle {
+  &.MuiTypography-root {
+    color: $color-text-light;
+  }
+}
+
+.dashboard__stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+
+  @media (max-width: 1199px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  @media (max-width: 767px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dashboard__stat-card {
+  &.MuiPaper-root {
+    border: 1px solid $color-border;
+    border-radius: 16px;
+    background: $color-surface;
+  }
+}
+
+.dashboard__stat-card-content {
+  &.MuiCardContent-root {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 24px;
+
+    &:last-child {
+      padding-bottom: 24px;
+    }
+  }
+}
+
+.dashboard__stat-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  flex-shrink: 0;
+}
+
+.dashboard__stat-icon-wrapper--primary {
+  background: rgba(37, 99, 235, 0.12);
+}
+
+.dashboard__stat-icon-wrapper--info {
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.dashboard__stat-icon-wrapper--success {
+  background: rgba(34, 197, 94, 0.12);
+}
+
+.dashboard__stat-icon-wrapper--warning {
+  background: rgba(245, 158, 11, 0.12);
+}
+
+.dashboard__stat-icon--primary {
+  color: #2563eb;
+}
+
+.dashboard__stat-icon--info {
+  color: #3b82f6;
+}
+
+.dashboard__stat-icon--success {
+  color: #22c55e;
+}
+
+.dashboard__stat-icon--warning {
+  color: #f59e0b;
+}
+
+.dashboard__stat-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dashboard__stat-value {
+  &.MuiTypography-root {
+    margin: 0;
+    font-weight: 700;
+    color: $color-text;
+  }
+}
+
+.dashboard__stat-label {
+  &.MuiTypography-root {
+    color: $color-text-light;
+  }
+}
+
+.dashboard__sections {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+
+  @media (max-width: 991px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dashboard__section-card {
+  &.MuiPaper-root {
+    border: 1px solid $color-border;
+    border-radius: 16px;
+    background: $color-surface;
+  }
+}
+
+.dashboard__section-content {
+  &.MuiCardContent-root {
+    padding: 24px;
+
+    &:last-child {
+      padding-bottom: 24px;
+    }
+  }
+}
+
+.dashboard__section-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 20px;
+}
+
+.dashboard__section-title {
+  &.MuiTypography-root {
+    font-weight: 700;
+    color: $color-text;
+  }
+}
+
+.dashboard__section-subtitle {
+  &.MuiTypography-root {
+    color: $color-text-light;
+  }
+}
+
+.dashboard__list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.dashboard__list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid $color-border;
+  border-radius: 14px;
+  padding: 16px;
+  background: #ffffff;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+
+  &:hover {
+    background: #f9fafb;
+  }
+
+  @media (max-width: 575px) {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+.dashboard__list-item--request {
+  @media (max-width: 575px) {
+    align-items: stretch;
+  }
+}
+
+.dashboard__list-item-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.dashboard__list-item-left--column {
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.dashboard__template-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: rgba(37, 99, 235, 0.12);
+  flex-shrink: 0;
+}
+
+.dashboard__template-icon {
+  color: #2563eb;
+}
+
+.dashboard__list-item-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dashboard__item-title {
+  &.MuiTypography-root {
+    font-weight: 600;
+    color: $color-text;
+  }
+}
+
+.dashboard__item-subtitle {
+  &.MuiTypography-root {
+    color: $color-text-light;
+  }
+}
+
+.dashboard__request-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dashboard__request-id {
+  &.MuiTypography-root {
+    color: $color-text-light;
+    font-family: monospace;
+    white-space: nowrap;
+  }
+}
