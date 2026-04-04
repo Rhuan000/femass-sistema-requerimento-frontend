@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 import { DashboardPage } from "../pages/dashboard/dashboard-page";
-import TemplatesPage from "../pages/templates/templates-page";
+import { TemplatesPage } from "../pages/templates/templates-page";
 import TemplateBuilderPage from "../pages/template-builder/template-builder-page";
 import RequestsPage from "../pages/requests/requests-page";
 import RequestFormPage from "../pages/request-form/request-form-page";
