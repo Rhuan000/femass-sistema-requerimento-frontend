@@ -1,5 +1,3 @@
-import "./dashboard.page.scss";
-
 function RequestsPage() {
   return <div>Requests</div>;
 }

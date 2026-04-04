@@ -1,5 +1,3 @@
-import "./dashboard.page.scss";
-
 function TemplateBuilderPage() {
   return <div>Template Builder</div>;
 }
