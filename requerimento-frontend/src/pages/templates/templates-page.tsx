@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Search,
   MoreVertical,
@@ -26,15 +27,8 @@ import type { RequestTemplate } from "../../lib/types";
 
 import "./templates-styles.scss";
 
-interface TemplatesListProps {
-  onSelectTemplate?: (template: RequestTemplate) => void;
-  onEditTemplate?: (template: RequestTemplate) => void;
-}
-
-export function TemplatesPage({
-  onSelectTemplate,
-  onEditTemplate,
-}: TemplatesListProps) {
+export function TemplatesPage() {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
@@ -69,15 +63,15 @@ export function TemplatesPage({
   };
 
   const handleViewTemplate = () => {
-    if (selectedTemplate && onSelectTemplate) {
-      onSelectTemplate(selectedTemplate);
+    if (selectedTemplate) {
+      navigate(`/requests/new/${selectedTemplate.id}`);
     }
     handleCloseMenu();
   };
 
   const handleEditSelectedTemplate = () => {
-    if (selectedTemplate && onEditTemplate) {
-      onEditTemplate(selectedTemplate);
+    if (selectedTemplate) {
+      navigate(`/templates/edit/${selectedTemplate.id}`);
     }
     handleCloseMenu();
   };
@@ -196,7 +190,7 @@ export function TemplatesPage({
                 <Button
                   variant="outlined"
                   size="small"
-                  onClick={() => onSelectTemplate?.(template)}
+                  onClick={() => navigate(`/requests/new/${template.id}`)}
                 >
                   Abrir Requerimento
                 </Button>
