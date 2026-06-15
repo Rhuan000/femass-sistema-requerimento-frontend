@@ -1,68 +1,73 @@
 export type FieldType =
   | "text"
-  | "textarea"
+  | "email"
   | "number"
   | "date"
   | "select"
-  | "checkbox"
-  | "file"
-  | "email";
-
-export type RequestStatus =
-  | "pending"
-  | "in_progress"
-  | "approved"
-  | "rejected";
+  | "textarea";
 
 export interface SelectOption {
   label: string;
   value: string;
 }
 
-export interface FormField {
-  id: string;
+export interface TemplateField {
+  id?: string;
   fieldKey: string;
   label: string;
   type: FieldType;
   required: boolean;
   placeholder?: string;
   description?: string;
+  position: number;
   options?: SelectOption[];
 }
 
-export interface RequestTemplate {
+export interface Template {
   id: string;
   name: string;
   description: string;
   category: string;
-  fields: FormField[];
-  createdAt: string;
-  updatedAt: string;
-  isActive: boolean;
+  active: boolean;
+  fields: TemplateField[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-export interface RequestRecord {
+export interface TemplateInput {
+  name: string;
+  description: string;
+  category: string;
+  active: boolean;
+  fields: TemplateField[];
+}
+
+export interface Submission {
   id: string;
   templateId: string;
-  templateName: string;
+  templateName?: string;
   submittedBy: string;
+  status: string;
   submittedAt: string;
-  status: RequestStatus;
+  data: Record<string, unknown>;
+}
+
+export interface SubmissionInput {
+  templateId: string;
+  submittedBy: string;
   data: Record<string, unknown>;
 }
 
 export const FIELD_TYPES: Array<{ value: FieldType; label: string }> = [
   { value: "text", label: "Texto curto" },
-  { value: "textarea", label: "Texto longo" },
+  { value: "email", label: "E-mail" },
   { value: "number", label: "Número" },
   { value: "date", label: "Data" },
-  { value: "email", label: "E-mail" },
   { value: "select", label: "Seleção" },
-  { value: "checkbox", label: "Checkbox" },
-  { value: "file", label: "Arquivo" },
+  { value: "textarea", label: "Texto longo" },
 ];
 
-export const TEMPLATE_CATEGORIES: string[] = [
+export const TEMPLATE_CATEGORIES = [
   "Acadêmico",
   "Financeiro",
   "Documentos",

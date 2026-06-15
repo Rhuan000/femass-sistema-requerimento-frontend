@@ -188,3 +188,28 @@
 .templates-list__menu-item--danger {
   color: #dc2626;
 }
+
+.templates-list__view-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.templates-list__header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+
+  @media (max-width: 639px) {
+    flex-direction: column;
+  }
+}
+
+.templates-list__badges,
+.templates-list__card-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}

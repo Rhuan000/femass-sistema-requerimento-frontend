@@ -1,9 +1,8 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Send, Upload } from "lucide-react";
+import { ArrowLeft, Send } from "lucide-react";
 import {
   Alert,
-  Box,
   Button,
   Card,
   CardContent,
@@ -12,97 +11,83 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
-  DialogContentText,
   DialogTitle,
   FormControl,
-  FormControlLabel,
   InputLabel,
   MenuItem,
   Select,
-  Switch,
   TextField,
   Typography,
 } from "@mui/material";
-
-import { mockTemplates } from "../../lib/mock-data";
-import type { RequestTemplate, SelectOption } from "../../lib/types";
+import { AsyncState } from "../../components/async-state/async-state";
+import { useTemplate } from "../../hooks/use-templates";
+import { getErrorMessage } from "../../lib/api/http-client";
+import { requestService } from "../../lib/api/request-service";
+import type { Submission, TemplateField } from "../../lib/types";
 import "./request-form-style.scss";
+
+function toSubmissionData(
+  fields: TemplateField[],
+  values: Record<string, string>,
+) {
+  return Object.fromEntries(
+    fields.map((field) => {
+      const value = values[field.fieldKey] ?? "";
+      if (field.type === "date" && value) {
+        return [field.fieldKey, new Date(`${value}T00:00:00.000Z`).toISOString()];
+      }
+      if (field.type === "number" && value !== "") {
+        return [field.fieldKey, Number(value)];
+      }
+      return [field.fieldKey, value];
+    }),
+  );
+}
+
+function formatDate(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? value
+    : new Intl.DateTimeFormat("pt-BR", {
+        dateStyle: "short",
+        timeStyle: "short",
+      }).format(date);
+}
 
 export function RequestFormPage() {
   const navigate = useNavigate();
   const { templateId } = useParams();
-  const [formData, setFormData] = useState<Record<string, unknown>>({});
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
-  const template = useMemo<RequestTemplate | undefined>(
-    () => mockTemplates.find((item) => item.id === templateId),
-    [templateId]
-  );
+  const { data: template, loading, error, reload } = useTemplate(templateId);
+  const [formData, setFormData] = useState<Record<string, string>>({});
+  const [submittedBy, setSubmittedBy] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submission, setSubmission] = useState<Submission | null>(null);
 
-  const handleBack = () => {
-    navigate("/requests");
+  const updateField = (fieldKey: string, value: string) => {
+    setFormData((current) => ({ ...current, [fieldKey]: value }));
   };
 
-  const handleFieldChange = (fieldName: string, value: unknown) => {
-    setFormData((previous) => ({
-      ...previous,
-      [fieldName]: value,
-    }));
-  };
-
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setShowConfirmDialog(true);
+    if (!template) return;
+
+    setSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      const result = await requestService.createSubmission({
+        templateId: template.id,
+        submittedBy: submittedBy.trim(),
+        data: toSubmissionData(template.fields, formData),
+      });
+      setSubmission(result);
+    } catch (requestError) {
+      setSubmitError(getErrorMessage(requestError));
+    } finally {
+      setSubmitting(false);
+    }
   };
-
-  const confirmSubmit = () => {
-    setShowConfirmDialog(false);
-    console.log("Enviar requerimento:", {
-      templateId: template?.id,
-      data: formData,
-    });
-    setShowSuccessDialog(true);
-  };
-
-  const getSelectOptions = (options?: SelectOption[]) => {
-    return options ?? [];
-  };
-
-  if (!template) {
-    return (
-      <div className="request-form">
-        <div className="request-form__header">
-          <Button
-            variant="text"
-            startIcon={<ArrowLeft size={18} />}
-            onClick={handleBack}
-            className="request-form__back-button"
-          >
-            Voltar
-          </Button>
-
-          <div className="request-form__header-text">
-            <Typography variant="h4" className="request-form__title">
-              Modelo não encontrado
-            </Typography>
-
-            <Typography variant="body1" className="request-form__subtitle">
-              O template solicitado não existe ou não está disponível.
-            </Typography>
-          </div>
-        </div>
-
-        <Card className="request-form__card" elevation={0}>
-          <CardContent className="request-form__card-content">
-            <Alert severity="warning">
-              Verifique o link acessado ou escolha outro modelo na listagem de
-              templates.
-            </Alert>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="request-form">
@@ -110,241 +95,195 @@ export function RequestFormPage() {
         <Button
           variant="text"
           startIcon={<ArrowLeft size={18} />}
-          onClick={handleBack}
+          onClick={() => navigate("/templates")}
           className="request-form__back-button"
         >
           Voltar
         </Button>
-
         <div className="request-form__header-text">
           <Typography variant="h4" className="request-form__title">
-            {template.name}
+            {template?.name ?? "Novo requerimento"}
           </Typography>
-
           <Typography variant="body1" className="request-form__subtitle">
-            {template.description}
+            {template?.description ?? "Carregando os dados do formulário..."}
           </Typography>
         </div>
       </div>
 
-      <Card className="request-form__card" elevation={0}>
-        <CardHeader
-          className="request-form__card-header"
-          title={
-            <div className="request-form__card-header-row">
-              <div className="request-form__card-header-text">
-                <Typography variant="h6" className="request-form__card-title">
-                  Formulário de Requerimento
-                </Typography>
+      <AsyncState loading={loading} error={error} onRetry={reload} />
 
-                <Typography
-                  variant="body2"
-                  className="request-form__card-description"
-                >
-                  Preencha os campos abaixo para enviar sua solicitação
-                </Typography>
+      {template && !loading && !error && (
+        <Card className="request-form__card" elevation={0}>
+          <CardHeader
+            className="request-form__card-header"
+            title={
+              <div className="request-form__card-header-row">
+                <div className="request-form__card-header-text">
+                  <Typography variant="h6" className="request-form__card-title">
+                    Formulário de requerimento
+                  </Typography>
+                  <Typography variant="body2" className="request-form__card-description">
+                    Campos marcados com * são obrigatórios.
+                  </Typography>
+                </div>
+                <Chip label={template.category} size="small" variant="outlined" />
+              </div>
+            }
+          />
+
+          <CardContent className="request-form__card-content">
+            {!template.active && (
+              <Alert severity="warning">
+                Este template está inativo e não aceita novos envios.
+              </Alert>
+            )}
+
+            <form onSubmit={handleSubmit} className="request-form__form">
+              <div className="request-form__field">
+                <label htmlFor="submittedBy" className="request-form__label">
+                  Identificação do usuário
+                  <span className="request-form__required" aria-hidden="true">*</span>
+                </label>
+                <TextField
+                  id="submittedBy"
+                  value={submittedBy}
+                  onChange={(event) => setSubmittedBy(event.target.value)}
+                  placeholder="Nome, matrícula ou e-mail"
+                  required
+                  fullWidth
+                />
               </div>
 
-              <Chip label={template.category} size="small" variant="outlined" />
-            </div>
-          }
-        />
+              {template.fields.map((field) => {
+                const inputId = `field-${field.fieldKey}`;
+                const value = formData[field.fieldKey] ?? "";
 
-        <CardContent className="request-form__card-content">
-          <form onSubmit={handleSubmit} className="request-form__form">
-            {template.fields.map((field) => {
-              const fieldKey = field.name || field.id;
-              const fieldValue = formData[fieldKey];
+                return (
+                  <div key={field.fieldKey} className="request-form__field">
+                    <label htmlFor={inputId} className="request-form__label">
+                      {field.label}
+                      {field.required && (
+                        <span className="request-form__required" aria-hidden="true">
+                          *
+                        </span>
+                      )}
+                    </label>
 
-              return (
-                <div key={field.id} className="request-form__field">
-                  <label htmlFor={field.id} className="request-form__label">
-                    <span>{field.label}</span>
-                    {field.required && (
-                      <span className="request-form__required">*</span>
-                    )}
-                  </label>
-
-                  {field.type === "textarea" ? (
-                    <TextField
-                      id={field.id}
-                      fullWidth
-                      multiline
-                      minRows={4}
-                      required={field.required}
-                      placeholder={field.placeholder}
-                      value={(fieldValue as string) || ""}
-                      onChange={(event) =>
-                        handleFieldChange(fieldKey, event.target.value)
-                      }
-                    />
-                  ) : field.type === "select" ? (
-                    <FormControl fullWidth required={field.required}>
-                      <InputLabel>{field.placeholder || "Selecione"}</InputLabel>
-                      <Select
-                        id={field.id}
-                        value={(fieldValue as string) || ""}
-                        label={field.placeholder || "Selecione"}
+                    {field.type === "textarea" ? (
+                      <TextField
+                        id={inputId}
+                        multiline
+                        minRows={4}
+                        value={value}
                         onChange={(event) =>
-                          handleFieldChange(fieldKey, event.target.value)
+                          updateField(field.fieldKey, event.target.value)
                         }
-                      >
-                        {getSelectOptions(field.options).map((option) => (
-                          <MenuItem key={option.value} value={option.value}>
-                            {option.label}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  ) : field.type === "checkbox" ? (
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          id={field.id}
-                          checked={(fieldValue as boolean) || false}
-                          onChange={(_, checked) =>
-                            handleFieldChange(fieldKey, checked)
-                          }
-                        />
-                      }
-                      label={
-                        field.placeholder || "Marque para confirmar"
-                      }
-                    />
-                  ) : field.type === "file" ? (
-                    <Box className="request-form__file-wrapper">
-                      <Button
-                        component="label"
-                        variant="outlined"
-                        startIcon={<Upload size={16} />}
-                      >
-                        Selecionar arquivo
-                        <input
-                          hidden
-                          id={field.id}
-                          type="file"
-                          required={field.required}
+                        placeholder={field.placeholder}
+                        required={field.required}
+                        fullWidth
+                      />
+                    ) : field.type === "select" ? (
+                      <FormControl fullWidth required={field.required}>
+                        <InputLabel id={`${inputId}-label`}>
+                          {field.placeholder || "Selecione"}
+                        </InputLabel>
+                        <Select
+                          id={inputId}
+                          labelId={`${inputId}-label`}
+                          label={field.placeholder || "Selecione"}
+                          value={value}
                           onChange={(event) =>
-                            handleFieldChange(
-                              fieldKey,
-                              event.target.files?.[0]?.name || ""
-                            )
+                            updateField(field.fieldKey, event.target.value)
                           }
-                        />
-                      </Button>
+                        >
+                          {(field.options ?? []).map((option) => (
+                            <MenuItem key={option.value} value={option.value}>
+                              {option.label}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    ) : (
+                      <TextField
+                        id={inputId}
+                        type={field.type}
+                        value={value}
+                        onChange={(event) =>
+                          updateField(field.fieldKey, event.target.value)
+                        }
+                        placeholder={field.placeholder}
+                        required={field.required}
+                        fullWidth
+                        slotProps={
+                          field.type === "number"
+                            ? { htmlInput: { step: "any" } }
+                            : undefined
+                        }
+                      />
+                    )}
 
+                    {field.description && (
                       <Typography
-                        variant="body2"
-                        className="request-form__file-name"
+                        id={`${inputId}-description`}
+                        variant="caption"
+                        className="request-form__field-description"
                       >
-                        {(fieldValue as string) || "Nenhum arquivo selecionado"}
+                        {field.description}
                       </Typography>
-                    </Box>
-                  ) : (
-                    <TextField
-                      id={field.id}
-                      fullWidth
-                      required={field.required}
-                      type={
-                        field.type === "date"
-                          ? "date"
-                          : field.type === "number"
-                            ? "number"
-                            : field.type === "email"
-                              ? "email"
-                              : "text"
-                      }
-                      placeholder={field.placeholder}
-                      value={(fieldValue as string) || ""}
-                      onChange={(event) =>
-                        handleFieldChange(fieldKey, event.target.value)
-                      }
-                      InputLabelProps={
-                        field.type === "date" ? { shrink: true } : undefined
-                      }
-                    />
-                  )}
+                    )}
+                  </div>
+                );
+              })}
 
-                  {field.description && (
-                    <Typography
-                      variant="caption"
-                      className="request-form__field-description"
-                    >
-                      {field.description}
-                    </Typography>
-                  )}
-                </div>
-              );
-            })}
+              {submitError && <Alert severity="error">{submitError}</Alert>}
 
-            <div className="request-form__actions">
-              <Button
-                type="button"
-                variant="outlined"
-                onClick={handleBack}
-                fullWidth
-              >
-                Cancelar
-              </Button>
+              <div className="request-form__actions">
+                <Button
+                  type="button"
+                  variant="outlined"
+                  onClick={() => navigate("/templates")}
+                  fullWidth
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  startIcon={<Send size={16} />}
+                  disabled={submitting || !template.active}
+                  fullWidth
+                >
+                  {submitting ? "Enviando..." : "Enviar requerimento"}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
 
-              <Button
-                type="submit"
-                variant="contained"
-                startIcon={<Send size={16} />}
-                fullWidth
-              >
-                Enviar Requerimento
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-
-      <Dialog
-        open={showConfirmDialog}
-        onClose={() => setShowConfirmDialog(false)}
-        maxWidth="xs"
-        fullWidth
-      >
-        <DialogTitle>Confirmar Envio</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Você está prestes a enviar o requerimento de{" "}
-            <strong>{template.name}</strong>. Deseja confirmar o envio?
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShowConfirmDialog(false)}>
-            Cancelar
-          </Button>
-          <Button variant="contained" onClick={confirmSubmit}>
-            Confirmar Envio
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog
-        open={showSuccessDialog}
-        onClose={() => setShowSuccessDialog(false)}
-        maxWidth="xs"
-        fullWidth
-      >
-        <DialogTitle>Requerimento Enviado</DialogTitle>
+      <Dialog open={Boolean(submission)} maxWidth="sm" fullWidth>
+        <DialogTitle>Requerimento enviado</DialogTitle>
         <DialogContent>
           <Alert severity="success" className="request-form__success-alert">
-            Seu requerimento foi enviado com sucesso. Você pode acompanhar o
-            status na seção de Requerimentos.
+            O requerimento foi recebido pela API.
           </Alert>
+          {submission && (
+            <dl className="request-form__confirmation">
+              <dt>ID</dt>
+              <dd>{submission.id}</dd>
+              <dt>Status</dt>
+              <dd>{submission.status}</dd>
+              <dt>Data do envio</dt>
+              <dd>{formatDate(submission.submittedAt)}</dd>
+            </dl>
+          )}
         </DialogContent>
         <DialogActions>
           <Button
             variant="contained"
-            onClick={() => {
-              setShowSuccessDialog(false);
-              handleBack();
-            }}
+            onClick={() => navigate("/templates")}
           >
-            OK
+            Voltar ao catálogo
           </Button>
         </DialogActions>
       </Dialog>

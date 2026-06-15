@@ -1,265 +1,191 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Edit2, FilePlus2, Search } from "lucide-react";
 import {
-  Search,
-  MoreVertical,
-  Eye,
-  Edit2,
-  Trash2,
-  Copy,
-} from "lucide-react";
-import {
+  Button,
   Card,
   CardContent,
   Chip,
-  IconButton,
   InputAdornment,
-  Menu,
-  MenuItem,
   OutlinedInput,
   Typography,
-  Button,
 } from "@mui/material";
-
-import { mockTemplates } from "../../lib/mock-data";
-import { TEMPLATE_CATEGORIES } from "../../lib/types";
-import type { RequestTemplate } from "../../lib/types";
-
+import { AsyncState } from "../../components/async-state/async-state";
+import { useTemplates } from "../../hooks/use-templates";
 import "./templates-styles.scss";
 
 export function TemplatesPage() {
   const navigate = useNavigate();
+  const { data: templates, loading, error, reload } = useTemplates();
+  const [view, setView] = useState<"catalog" | "admin">("catalog");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
-  const [selectedTemplate, setSelectedTemplate] = useState<RequestTemplate | null>(null);
+
+  const categories = useMemo(
+    () =>
+      [...new Set((templates ?? []).map((template) => template.category))].sort(),
+    [templates],
+  );
 
   const filteredTemplates = useMemo(() => {
-    return mockTemplates.filter((template) => {
-      const normalizedSearch = searchQuery.toLowerCase().trim();
+    const query = searchQuery.toLocaleLowerCase("pt-BR").trim();
 
+    return (templates ?? []).filter((template) => {
+      if (view === "catalog" && !template.active) return false;
       const matchesSearch =
-        template.name.toLowerCase().includes(normalizedSearch) ||
-        template.description.toLowerCase().includes(normalizedSearch);
-
+        template.name.toLocaleLowerCase("pt-BR").includes(query) ||
+        template.description.toLocaleLowerCase("pt-BR").includes(query);
       const matchesCategory =
         !selectedCategory || template.category === selectedCategory;
-
       return matchesSearch && matchesCategory;
     });
-  }, [searchQuery, selectedCategory]);
-
-  const handleOpenMenu = (
-    event: React.MouseEvent<HTMLElement>,
-    template: RequestTemplate
-  ) => {
-    setMenuAnchorEl(event.currentTarget);
-    setSelectedTemplate(template);
-  };
-
-  const handleCloseMenu = () => {
-    setMenuAnchorEl(null);
-    setSelectedTemplate(null);
-  };
-
-  const handleViewTemplate = () => {
-    if (selectedTemplate) {
-      navigate(`/requests/new/${selectedTemplate.id}`);
-    }
-    handleCloseMenu();
-  };
-
-  const handleEditSelectedTemplate = () => {
-    if (selectedTemplate) {
-      navigate(`/templates/edit/${selectedTemplate.id}`);
-    }
-    handleCloseMenu();
-  };
-
-  const handleDuplicateTemplate = () => {
-    if (selectedTemplate) {
-      console.log("Duplicar template:", selectedTemplate);
-    }
-    handleCloseMenu();
-  };
-
-  const handleDeleteTemplate = () => {
-    if (selectedTemplate) {
-      console.log("Excluir template:", selectedTemplate);
-    }
-    handleCloseMenu();
-  };
+  }, [searchQuery, selectedCategory, templates, view]);
 
   return (
     <div className="templates-list">
-      <div className="templates-list__header">
-        <Typography variant="h4" className="templates-list__title">
-          Modelos de Requerimento
-        </Typography>
+      <div className="templates-list__header-row">
+        <div className="templates-list__header">
+          <Typography variant="h4" className="templates-list__title">
+            {view === "catalog"
+              ? "Catálogo de requerimentos"
+              : "Administração de templates"}
+          </Typography>
+          <Typography variant="body1" className="templates-list__subtitle">
+            {view === "catalog"
+              ? "Escolha um template ativo para preencher."
+              : "Crie e edite os templates cadastrados."}
+          </Typography>
+        </div>
 
-        <Typography variant="body1" className="templates-list__subtitle">
-          Gerencie os modelos disponíveis para abertura de requerimentos
-        </Typography>
+        {view === "admin" && (
+          <Button
+            variant="contained"
+            startIcon={<FilePlus2 size={18} />}
+            onClick={() => navigate("/templates/new")}
+          >
+            Novo template
+          </Button>
+        )}
       </div>
 
-      <div className="templates-list__filters">
-        <div className="templates-list__search">
+      {!loading && !error && (
+        <div className="templates-list__filters">
+          <div className="templates-list__view-switch" aria-label="Modo de visualização">
+            <Button
+              variant={view === "catalog" ? "contained" : "outlined"}
+              onClick={() => setView("catalog")}
+            >
+              Catálogo
+            </Button>
+            <Button
+              variant={view === "admin" ? "contained" : "outlined"}
+              onClick={() => setView("admin")}
+            >
+              Administração
+            </Button>
+          </div>
           <OutlinedInput
             fullWidth
-            placeholder="Buscar modelos..."
+            placeholder="Buscar por nome ou descrição..."
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
+            inputProps={{ "aria-label": "Buscar templates" }}
             startAdornment={
               <InputAdornment position="start">
                 <Search size={18} />
               </InputAdornment>
             }
           />
-        </div>
 
-        <div className="templates-list__categories">
-          <Button
-            variant={selectedCategory === null ? "contained" : "outlined"}
-            size="small"
-            onClick={() => setSelectedCategory(null)}
-          >
-            Todos
-          </Button>
-
-          {TEMPLATE_CATEGORIES.map((category) => (
+          <div className="templates-list__categories" aria-label="Categorias">
             <Button
-              key={category}
-              variant={selectedCategory === category ? "contained" : "outlined"}
+              variant={selectedCategory === null ? "contained" : "outlined"}
               size="small"
-              onClick={() => setSelectedCategory(category)}
+              onClick={() => setSelectedCategory(null)}
             >
-              {category}
+              Todas
             </Button>
-          ))}
-        </div>
-      </div>
-
-      <div className="templates-list__grid">
-        {filteredTemplates.map((template) => (
-          <Card
-            key={template.id}
-            className="templates-list__card"
-            elevation={0}
-          >
-            <CardContent className="templates-list__card-content">
-              <div className="templates-list__card-header">
-                <div className="templates-list__card-header-main">
-                  <Typography
-                    variant="h6"
-                    className="templates-list__card-title"
-                  >
-                    {template.name}
-                  </Typography>
-
-                  <Chip
-                    label={template.category}
-                    size="small"
-                    variant="outlined"
-                  />
-                </div>
-
-                <IconButton
-                  aria-label={`Abrir ações de ${template.name}`}
-                  onClick={(event) => handleOpenMenu(event, template)}
-                  size="small"
-                >
-                  <MoreVertical size={18} />
-                </IconButton>
-              </div>
-
-              <Typography
-                variant="body2"
-                className="templates-list__description"
+            {categories.map((category) => (
+              <Button
+                key={category}
+                variant={
+                  selectedCategory === category ? "contained" : "outlined"
+                }
+                size="small"
+                onClick={() => setSelectedCategory(category)}
               >
-                {template.description}
-              </Typography>
-
-              <div className="templates-list__card-footer">
-                <Typography
-                  variant="body2"
-                  className="templates-list__fields-count"
-                >
-                  {template.fields.length} campos
-                </Typography>
-
-                <Button
-                  variant="outlined"
-                  size="small"
-                  onClick={() => navigate(`/requests/new/${template.id}`)}
-                >
-                  Abrir Requerimento
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {filteredTemplates.length === 0 && (
-        <div className="templates-list__empty">
-          <div className="templates-list__empty-icon">
-            <Search size={28} />
+                {category}
+              </Button>
+            ))}
           </div>
-
-          <Typography variant="h6" className="templates-list__empty-title">
-            Nenhum modelo encontrado
-          </Typography>
-
-          <Typography
-            variant="body2"
-            className="templates-list__empty-subtitle"
-          >
-            Tente ajustar os filtros ou criar um novo modelo
-          </Typography>
         </div>
       )}
 
-      <Menu
-        anchorEl={menuAnchorEl}
-        open={Boolean(menuAnchorEl)}
-        onClose={handleCloseMenu}
-        anchorOrigin={{
-          vertical: "bottom",
-          horizontal: "right",
-        }}
-        transformOrigin={{
-          vertical: "top",
-          horizontal: "right",
-        }}
-      >
-        <MenuItem onClick={handleViewTemplate}>
-          <div className="templates-list__menu-item">
-            <Eye size={16} />
-            <span>Visualizar</span>
-          </div>
-        </MenuItem>
+      <AsyncState
+        loading={loading}
+        error={error}
+        onRetry={reload}
+        empty={!loading && !error && filteredTemplates.length === 0}
+        emptyTitle="Nenhum template encontrado"
+        emptyDescription="Ajuste os filtros ou cadastre um novo template."
+      />
 
-        <MenuItem onClick={handleEditSelectedTemplate}>
-          <div className="templates-list__menu-item">
-            <Edit2 size={16} />
-            <span>Editar</span>
-          </div>
-        </MenuItem>
+      {!loading && !error && filteredTemplates.length > 0 && (
+        <div className="templates-list__grid">
+          {filteredTemplates.map((template) => (
+            <Card key={template.id} className="templates-list__card" elevation={0}>
+              <CardContent className="templates-list__card-content">
+                <div className="templates-list__card-header">
+                  <div className="templates-list__card-header-main">
+                    <Typography variant="h6" className="templates-list__card-title">
+                      {template.name}
+                    </Typography>
+                    <div className="templates-list__badges">
+                      <Chip label={template.category} size="small" variant="outlined" />
+                      <Chip
+                        label={template.active ? "Ativo" : "Inativo"}
+                        size="small"
+                        color={template.active ? "success" : "default"}
+                      />
+                    </div>
+                  </div>
+                </div>
 
-        <MenuItem onClick={handleDuplicateTemplate}>
-          <div className="templates-list__menu-item">
-            <Copy size={16} />
-            <span>Duplicar</span>
-          </div>
-        </MenuItem>
+                <Typography variant="body2" className="templates-list__description">
+                  {template.description}
+                </Typography>
 
-        <MenuItem onClick={handleDeleteTemplate}>
-          <div className="templates-list__menu-item templates-list__menu-item--danger">
-            <Trash2 size={16} />
-            <span>Excluir</span>
-          </div>
-        </MenuItem>
-      </Menu>
+                <div className="templates-list__card-footer">
+                  <Typography variant="body2" className="templates-list__fields-count">
+                    {template.fields.length}{" "}
+                    {template.fields.length === 1 ? "campo" : "campos"}
+                  </Typography>
+                  <div className="templates-list__card-actions">
+                    {view === "admin" && (
+                      <Button
+                        variant="text"
+                        size="small"
+                        startIcon={<Edit2 size={15} />}
+                        onClick={() => navigate(`/templates/edit/${template.id}`)}
+                      >
+                        Editar
+                      </Button>
+                    )}
+                    <Button
+                      variant="contained"
+                      size="small"
+                      disabled={!template.active}
+                      onClick={() => navigate(`/requests/new/${template.id}`)}
+                    >
+                      Preencher
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

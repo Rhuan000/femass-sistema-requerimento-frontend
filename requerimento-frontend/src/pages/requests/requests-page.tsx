@@ -1,303 +1,193 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Filter, ChevronDown } from "lucide-react";
+import { Search } from "lucide-react";
 import {
   Button,
   Card,
   CardContent,
   Chip,
-  InputAdornment,
-  Menu,
+  FormControl,
+  InputLabel,
   MenuItem,
-  OutlinedInput,
+  Select,
+  TextField,
   Typography,
 } from "@mui/material";
-
-
-import { mockRequests } from "../../lib/mock-data";
-import type { RequestStatus } from "../../lib/types";
-
+import { AsyncState } from "../../components/async-state/async-state";
+import { useAsync } from "../../hooks/use-async";
+import { useTemplates } from "../../hooks/use-templates";
+import { requestService } from "../../lib/api/request-service";
+import type { Submission } from "../../lib/types";
 import "./requests-page-style.scss";
 
-type StatusConfigItem = {
-  label: string;
-  colorClassName: string;
-  chipColor: "default" | "primary" | "success" | "warning" | "error";
-};
+function formatDate(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? value
+    : new Intl.DateTimeFormat("pt-BR", {
+        dateStyle: "short",
+        timeStyle: "short",
+      }).format(date);
+}
 
-const statusConfig: Record<RequestStatus, StatusConfigItem> = {
-  pending: {
-    label: "Pendente",
-    colorClassName: "requests-list__status--pending",
-    chipColor: "warning",
-  },
-  in_progress: {
-    label: "Em Análise",
-    colorClassName: "requests-list__status--in-progress",
-    chipColor: "primary",
-  },
-  approved: {
-    label: "Aprovado",
-    colorClassName: "requests-list__status--approved",
-    chipColor: "success",
-  },
-  rejected: {
-    label: "Rejeitado",
-    colorClassName: "requests-list__status--rejected",
-    chipColor: "error",
-  },
-};
+function statusColor(
+  status: string,
+): "default" | "primary" | "success" | "warning" | "error" {
+  const normalized = status.toLowerCase();
+  if (normalized.includes("aprov") || normalized.includes("concl")) return "success";
+  if (normalized.includes("reje") || normalized.includes("cancel")) return "error";
+  if (normalized.includes("analis") || normalized.includes("progress")) return "primary";
+  if (normalized.includes("pend")) return "warning";
+  return "default";
+}
+
+function Answers({ submission }: { submission: Submission }) {
+  const entries = Object.entries(submission.data);
+  if (!entries.length) return <span>Nenhuma resposta</span>;
+
+  return (
+    <dl className="requests-list__answers">
+      {entries.map(([key, value]) => (
+        <div key={key}>
+          <dt>{key}</dt>
+          <dd>{String(value ?? "")}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
 
 export function RequestsPage() {
   const navigate = useNavigate();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<Set<RequestStatus>>(new Set());
-  const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
+  const { data: templates, loading: loadingTemplates, error: templatesError, reload } =
+    useTemplates();
+  const [templateId, setTemplateId] = useState("");
+  const [search, setSearch] = useState("");
 
-  const filteredRequests = useMemo(() => {
-    const normalizedQuery = searchQuery.toLowerCase().trim();
+  const selectedTemplateId = templateId || templates?.[0]?.id || "";
 
-    return mockRequests.filter((request) => {
-      const matchesSearch =
-        request.templateName.toLowerCase().includes(normalizedQuery) ||
-        request.submittedBy.toLowerCase().includes(normalizedQuery) ||
-        request.id.toLowerCase().includes(normalizedQuery);
+  const {
+    data: submissions,
+    loading: loadingSubmissions,
+    error: submissionsError,
+    reload: reloadSubmissions,
+  } = useAsync(
+    () =>
+      selectedTemplateId
+        ? requestService.listSubmissionsByTemplate(selectedTemplateId)
+        : Promise.resolve([]),
+    selectedTemplateId,
+  );
 
-      const matchesStatus =
-        statusFilter.size === 0 || statusFilter.has(request.status);
+  const filtered = useMemo(() => {
+    const query = search.toLocaleLowerCase("pt-BR").trim();
+    return (submissions ?? []).filter(
+      (submission) =>
+        submission.id.toLocaleLowerCase("pt-BR").includes(query) ||
+        submission.submittedBy.toLocaleLowerCase("pt-BR").includes(query) ||
+        submission.status.toLocaleLowerCase("pt-BR").includes(query),
+    );
+  }, [search, submissions]);
 
-      return matchesSearch && matchesStatus;
-    });
-  }, [searchQuery, statusFilter]);
-
-  const toggleStatus = (status: RequestStatus) => {
-    const newFilter = new Set(statusFilter);
-
-    if (newFilter.has(status)) {
-      newFilter.delete(status);
-    } else {
-      newFilter.add(status);
-    }
-
-    setStatusFilter(newFilter);
-  };
-
-  const handleOpenFilterMenu = (event: React.MouseEvent<HTMLElement>) => {
-    setMenuAnchorEl(event.currentTarget);
-  };
-
-  const handleCloseFilterMenu = () => {
-    setMenuAnchorEl(null);
-  };
-
-  const handleOpenRequest = (templateId: string) => {
-    navigate(`/requests/new/${templateId}`);
-  };
+  const loading =
+    loadingTemplates || (Boolean(selectedTemplateId) && loadingSubmissions);
+  const error = templatesError || submissionsError;
 
   return (
     <div className="requests-list">
       <div className="requests-list__header">
         <Typography variant="h4" className="requests-list__title">
-          Requerimentos
+          Consulta de envios
         </Typography>
-
         <Typography variant="body1" className="requests-list__subtitle">
-          Acompanhe o status das solicitações enviadas
+          Selecione um template para consultar os requerimentos recebidos.
         </Typography>
       </div>
 
-      <div className="requests-list__filters">
-        <div className="requests-list__search">
-          <OutlinedInput
-            fullWidth
-            placeholder="Buscar por tipo, solicitante ou ID..."
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            startAdornment={
-              <InputAdornment position="start">
-                <Search size={18} />
-              </InputAdornment>
-            }
+      {!loadingTemplates && !templatesError && (
+        <div className="requests-list__filters">
+          <FormControl className="requests-list__template-select">
+            <InputLabel id="template-filter-label">Template</InputLabel>
+            <Select
+              labelId="template-filter-label"
+              value={selectedTemplateId}
+              label="Template"
+              onChange={(event) => setTemplateId(event.target.value)}
+            >
+              {(templates ?? []).map((template) => (
+                <MenuItem key={template.id} value={template.id}>
+                  {template.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <TextField
+            className="requests-list__search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Buscar por ID, usuário ou status"
+            slotProps={{
+              input: {
+                startAdornment: <Search size={18} className="requests-list__search-icon" />,
+              },
+            }}
           />
         </div>
+      )}
 
-        <div className="requests-list__filter-action">
-          <Button
-            variant="outlined"
-            onClick={handleOpenFilterMenu}
-            startIcon={<Filter size={16} />}
-            endIcon={<ChevronDown size={16} />}
-          >
-            Filtrar Status
-            {statusFilter.size > 0 && (
-              <span className="requests-list__filter-count">
-                {statusFilter.size}
-              </span>
-            )}
-          </Button>
+      <AsyncState
+        loading={loading}
+        error={error}
+        onRetry={templatesError ? reload : reloadSubmissions}
+        empty={!loading && !error && filtered.length === 0}
+        emptyTitle={
+          templates?.length === 0 ? "Nenhum template cadastrado" : "Nenhum envio encontrado"
+        }
+        emptyDescription={
+          search
+            ? "Ajuste o termo de busca."
+            : "Este template ainda não possui envios."
+        }
+      />
 
-          <Menu
-            anchorEl={menuAnchorEl}
-            open={Boolean(menuAnchorEl)}
-            onClose={handleCloseFilterMenu}
-            anchorOrigin={{
-              vertical: "bottom",
-              horizontal: "right",
-            }}
-            transformOrigin={{
-              vertical: "top",
-              horizontal: "right",
-            }}
-          >
-            {(Object.keys(statusConfig) as RequestStatus[]).map((status) => {
-              const active = statusFilter.has(status);
-
-              return (
-                <MenuItem
-                  key={status}
-                  onClick={() => toggleStatus(status)}
-                  className="requests-list__menu-item"
-                >
-                  <div className="requests-list__menu-item-content">
-                    <span>{statusConfig[status].label}</span>
-                    {active && (
-                      <span className="requests-list__menu-item-check">✓</span>
-                    )}
+      {!loading && !error && filtered.length > 0 && (
+        <div className="requests-list__cards">
+          {filtered.map((submission) => (
+            <Card key={submission.id} className="requests-list__submission" elevation={0}>
+              <CardContent>
+                <div className="requests-list__submission-header">
+                  <div>
+                    <Typography variant="overline">ID do envio</Typography>
+                    <Typography className="requests-list__cell-id">
+                      {submission.id}
+                    </Typography>
                   </div>
-                </MenuItem>
-              );
-            })}
-          </Menu>
-        </div>
-      </div>
-
-      <div className="requests-list__mobile">
-        {filteredRequests.map((request) => (
-          <Card
-            key={request.id}
-            className="requests-list__mobile-card"
-            elevation={0}
-          >
-            <CardContent className="requests-list__mobile-card-content">
-              <div className="requests-list__mobile-card-top">
-                <div className="requests-list__mobile-card-main">
-                  <Typography
-                    variant="h6"
-                    className="requests-list__mobile-card-title"
-                  >
-                    {request.templateName}
-                  </Typography>
-
-                  <Typography
-                    variant="caption"
-                    className="requests-list__mobile-card-id"
-                  >
-                    {request.id}
-                  </Typography>
+                  <Chip
+                    label={submission.status}
+                    color={statusColor(submission.status)}
+                    size="small"
+                  />
                 </div>
-
-                <Chip
-                  label={statusConfig[request.status].label}
-                  size="small"
-                  className={statusConfig[request.status].colorClassName}
-                />
-              </div>
-
-              <div className="requests-list__mobile-card-info">
-                <div className="requests-list__mobile-card-row">
-                  <span className="requests-list__mobile-card-label">
-                    Solicitante:
-                  </span>
-                  <span className="requests-list__mobile-card-value">
-                    {request.submittedBy}
-                  </span>
+                <div className="requests-list__metadata">
+                  <div>
+                    <span>Usuário</span>
+                    <strong>{submission.submittedBy}</strong>
+                  </div>
+                  <div>
+                    <span>Data</span>
+                    <strong>{formatDate(submission.submittedAt)}</strong>
+                  </div>
                 </div>
-
-                <div className="requests-list__mobile-card-row">
-                  <span className="requests-list__mobile-card-label">Data:</span>
-                  <span className="requests-list__mobile-card-value">
-                    {request.submittedAt}
-                  </span>
+                <div className="requests-list__answers-block">
+                  <Typography variant="subtitle2">Respostas</Typography>
+                  <Answers submission={submission} />
                 </div>
-              </div>
-
-              <div className="requests-list__mobile-card-footer">
-                <Button
-                  variant="text"
-                  size="small"
-                  onClick={() => handleOpenRequest(request.templateId)}
-                >
-                  Ver detalhes
+                <Button onClick={() => navigate(`/requests/${submission.id}`)}>
+                  Consultar detalhes
                 </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <Card className="requests-list__table-card" elevation={0}>
-        <CardContent className="requests-list__table-card-content">
-          <div className="requests-list__table-wrapper">
-            <table className="requests-list__table">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Tipo</th>
-                  <th>Solicitante</th>
-                  <th>Data</th>
-                  <th>Status</th>
-                  <th></th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {filteredRequests.map((request) => (
-                  <tr key={request.id}>
-                    <td className="requests-list__cell-id">{request.id}</td>
-                    <td className="requests-list__cell-strong">
-                      {request.templateName}
-                    </td>
-                    <td>{request.submittedBy}</td>
-                    <td className="requests-list__cell-muted">
-                      {request.submittedAt}
-                    </td>
-                    <td>
-                      <Chip
-                        label={statusConfig[request.status].label}
-                        size="small"
-                        className={statusConfig[request.status].colorClassName}
-                      />
-                    </td>
-                    <td className="requests-list__cell-action">
-                      <Button
-                        variant="text"
-                        size="small"
-                        onClick={() => handleOpenRequest(request.templateId)}
-                      >
-                        Ver detalhes
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
-
-      {filteredRequests.length === 0 && (
-        <div className="requests-list__empty">
-          <div className="requests-list__empty-icon">
-            <Search size={28} />
-          </div>
-
-          <Typography variant="h6" className="requests-list__empty-title">
-            Nenhum requerimento encontrado
-          </Typography>
-
-          <Typography variant="body2" className="requests-list__empty-subtitle">
-            Tente ajustar os filtros de busca
-          </Typography>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       )}
     </div>

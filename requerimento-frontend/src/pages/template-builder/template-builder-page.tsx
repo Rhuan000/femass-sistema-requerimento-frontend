@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   Accordion,
   AccordionDetails,
   AccordionSummary,
+  Alert,
   Button,
   Card,
   CardContent,
@@ -15,239 +16,285 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import {
-  ChevronDown,
-  FileText,
-  GripVertical,
-  Plus,
-  Trash2,
-} from "lucide-react";
-
-import { mockTemplates } from "../../lib/mock-data";
+import { ChevronDown, FileText, Plus, Trash2 } from "lucide-react";
+import { AsyncState } from "../../components/async-state/async-state";
+import { useAsync } from "../../hooks/use-async";
+import { getErrorMessage } from "../../lib/api/http-client";
+import { requestService } from "../../lib/api/request-service";
 import {
   FIELD_TYPES,
   TEMPLATE_CATEGORIES,
   type FieldType,
-  type FormField,
+  type SelectOption,
+  type TemplateField,
+  type TemplateInput,
 } from "../../lib/types";
-
 import "./template-builder-styles.scss";
 
-type BuilderTemplate = {
-  id?: string;
-  name: string;
-  description: string;
-  category: string;
-  fields: FormField[];
-};
+interface EditableField extends TemplateField {
+  clientId: string;
+}
 
-const fieldTypePlaceholders: Record<FieldType, string> = {
-  text: "Digite um valor",
-  textarea: "Escreva aqui",
-  number: "0",
-  date: "",
-  select: "Selecione uma opção",
-  checkbox: "",
-  file: "",
-  email: "usuario@exemplo.com",
-};
+const FIELD_KEY_PATTERN = /^[a-z0-9_]+$/;
 
-const createFieldId = () =>
-  `field-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+const createClientId = () =>
+  globalThis.crypto?.randomUUID?.() ??
+  `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-const slugifyFieldName = (label: string) =>
-  label
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim()
-    .replace(/\s+/g, "_");
-
-const createEmptyField = (): FormField => ({
-  id: createFieldId(),
+const createField = (position: number): EditableField => ({
+  clientId: createClientId(),
   fieldKey: "",
   label: "",
   type: "text",
   required: false,
-  placeholder: fieldTypePlaceholders.text,
+  placeholder: "",
   description: "",
+  position,
   options: undefined,
 });
 
-const createInitialTemplate = (templateId?: string): BuilderTemplate => {
-  const template = mockTemplates.find((item) => item.id === templateId);
-
-  if (!template) {
-    return {
-      name: "",
-      description: "",
-      category: TEMPLATE_CATEGORIES[0] ?? "Outros",
-      fields: [],
-    };
-  }
-
-  return {
-    id: template.id,
-    name: template.name,
-    description: template.description,
-    category: template.category,
-    fields: template.fields.map((field) => ({
-      ...field,
-      options: field.options?.map((option) => ({ ...option })),
-    })),
-  };
-};
-
-function getFieldTypeLabel(type: FieldType) {
-  return FIELD_TYPES.find((item) => item.value === type)?.label ?? type;
-}
+const slugify = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
 
 function TemplateBuilderPage() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const [template, setTemplate] = useState<BuilderTemplate>(() =>
-    createInitialTemplate(id)
+  const {
+    data: loadedTemplate,
+    loading,
+    error: loadError,
+    reload,
+  } = useAsync(
+    () => (id ? requestService.getTemplate(id) : Promise.resolve(null)),
+    id,
   );
-  const [expandedFieldId, setExpandedFieldId] = useState<string | false>(
-    template.fields[0]?.id ?? false
+
+  const [template, setTemplate] = useState<TemplateInput>({
+    name: "",
+    description: "",
+    category: TEMPLATE_CATEGORIES[0],
+    active: true,
+    fields: [],
+  });
+  const [fields, setFields] = useState<EditableField[]>([]);
+  const [initializedId, setInitializedId] = useState<string | null | undefined>(
+    undefined,
   );
+  const [expandedId, setExpandedId] = useState<string | false>(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  const isEditing = Boolean(template.id);
+  useEffect(() => {
+    if (loading || initializedId === (id ?? null)) return;
 
-  const previewFields = useMemo(() => template.fields, [template.fields]);
-
-  const updateTemplate = (patch: Partial<BuilderTemplate>) => {
-    setTemplate((current) => ({ ...current, ...patch }));
-  };
-
-  const updateField = (fieldId: string, patch: Partial<FormField>) => {
-    setTemplate((current) => ({
-      ...current,
-      fields: current.fields.map((field) => {
-        if (field.id !== fieldId) {
-          return field;
-        }
-
-        const nextField = { ...field, ...patch };
-
-        if (patch.type && patch.type !== "select") {
-          nextField.options = undefined;
-        }
-
-        if (patch.type === "select" && !nextField.options?.length) {
-          nextField.options = [
-            { label: "Opção 1", value: "opcao_1" },
-            { label: "Opção 2", value: "opcao_2" },
-          ];
-        }
-
-        return nextField;
-      }),
-    }));
-  };
-
-  const handleAddField = () => {
-    const newField = createEmptyField();
-
-    setTemplate((current) => ({
-      ...current,
-      fields: [...current.fields, newField],
-    }));
-    setExpandedFieldId(newField.id);
-  };
-
-  const handleDeleteField = (fieldId: string) => {
-    setTemplate((current) => ({
-      ...current,
-      fields: current.fields.filter((field) => field.id !== fieldId),
-    }));
-    setExpandedFieldId((current) => (current === fieldId ? false : current));
-  };
-
-  const handleFieldLabelChange = (fieldId: string, label: string) => {
-    updateField(fieldId, {
-      label,
-      fieldKey: slugifyFieldName(label),
-    });
-  };
-
-  const handleFieldTypeChange = (fieldId: string, type: FieldType) => {
-    updateField(fieldId, {
-      type,
-      placeholder: fieldTypePlaceholders[type],
-      options:
-        type === "select"
-          ? [
-              { label: "Opção 1", value: "opcao_1" },
-              { label: "Opção 2", value: "opcao_2" },
-            ]
-          : undefined,
-    });
-  };
-
-  const handleOptionsChange = (fieldId: string, value: string) => {
-    const options = value
-      .split("\n")
-      .map((option) => option.trim())
-      .filter(Boolean)
-      .map((option) => ({
-        label: option,
-        value: slugifyFieldName(option),
+    if (loadedTemplate) {
+      setTemplate({
+        name: loadedTemplate.name,
+        description: loadedTemplate.description,
+        category: loadedTemplate.category,
+        active: loadedTemplate.active,
+        fields: [],
+      });
+      const editableFields = loadedTemplate.fields.map((field) => ({
+        ...field,
+        clientId: createClientId(),
+        options: field.options?.map((option) => ({ ...option })),
       }));
+      setFields(editableFields);
+      setExpandedId(editableFields[0]?.clientId ?? false);
+    }
 
-    updateField(fieldId, {
-      options,
+    setInitializedId(id ?? null);
+  }, [id, initializedId, loadedTemplate, loading]);
+
+  const duplicateKeys = useMemo(() => {
+    const counts = new Map<string, number>();
+    fields.forEach((field) => {
+      if (field.fieldKey) {
+        counts.set(field.fieldKey, (counts.get(field.fieldKey) ?? 0) + 1);
+      }
     });
+    return new Set(
+      [...counts.entries()]
+        .filter(([, count]) => count > 1)
+        .map(([fieldKey]) => fieldKey),
+    );
+  }, [fields]);
+
+  const updateField = (clientId: string, patch: Partial<EditableField>) => {
+    setFields((current) =>
+      current.map((field) => {
+        if (field.clientId !== clientId) return field;
+        const next = { ...field, ...patch };
+
+        if (patch.type && patch.type !== "select") next.options = undefined;
+        if (patch.type === "select" && !next.options?.length) {
+          next.options = [{ label: "", value: "" }];
+        }
+        return next;
+      }),
+    );
   };
 
-  const handleSave = () => {
-    console.log("Salvar template:", template);
-    navigate("/templates");
+  const updateOption = (
+    clientId: string,
+    optionIndex: number,
+    patch: Partial<SelectOption>,
+  ) => {
+    const field = fields.find((item) => item.clientId === clientId);
+    const options = (field?.options ?? []).map((option, index) =>
+      index === optionIndex ? { ...option, ...patch } : option,
+    );
+    updateField(clientId, { options });
   };
+
+  const addField = () => {
+    const field = createField(fields.length + 1);
+    setFields((current) => [...current, field]);
+    setExpandedId(field.clientId);
+  };
+
+  const removeField = (clientId: string) => {
+    setFields((current) =>
+      current
+        .filter((field) => field.clientId !== clientId)
+        .map((field, index) => ({ ...field, position: index + 1 })),
+    );
+  };
+
+  const validate = () => {
+    if (!template.name.trim()) return "Informe o nome do template.";
+    if (!template.category.trim()) return "Informe a categoria.";
+    if (fields.length === 0) return "Adicione pelo menos um campo.";
+
+    for (const field of fields) {
+      if (!field.label.trim()) return "Todos os campos precisam de um rótulo.";
+      if (!FIELD_KEY_PATTERN.test(field.fieldKey)) {
+        return `A chave "${field.fieldKey || "(vazia)"}" deve conter apenas letras minúsculas, números e _.`;
+      }
+      if (duplicateKeys.has(field.fieldKey)) {
+        return `A chave "${field.fieldKey}" está duplicada.`;
+      }
+      if (!Number.isInteger(field.position) || field.position < 1) {
+        return `A posição do campo "${field.label}" deve ser um inteiro positivo.`;
+      }
+      if (
+        field.type === "select" &&
+        (!field.options?.length ||
+          field.options.some(
+            (option) => !option.label.trim() || !option.value.trim(),
+          ))
+      ) {
+        return `Preencha o label e o value de todas as opções de "${field.label}".`;
+      }
+    }
+
+    const positions = fields.map((field) => field.position);
+    if (new Set(positions).size !== positions.length) {
+      return "As posições dos campos não podem se repetir.";
+    }
+    return null;
+  };
+
+  const handleSave = async () => {
+    const validationError = validate();
+    if (validationError) {
+      setSaveError(validationError);
+      return;
+    }
+
+    setSaving(true);
+    setSaveError(null);
+
+    const payload: TemplateInput = {
+      ...template,
+      name: template.name.trim(),
+      description: template.description.trim(),
+      category: template.category.trim(),
+      fields: fields
+        .map((field) => ({
+          id: field.id,
+          fieldKey: field.fieldKey,
+          label: field.label,
+          type: field.type,
+          required: field.required,
+          placeholder: field.placeholder,
+          description: field.description,
+          position: field.position,
+          options: field.type === "select" ? field.options : undefined,
+        }))
+        .sort((a, b) => a.position - b.position),
+    };
+
+    try {
+      if (id) await requestService.updateTemplate(id, payload);
+      else await requestService.createTemplate(payload);
+      navigate("/templates");
+    } catch (requestError) {
+      setSaveError(getErrorMessage(requestError));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (id && (loading || loadError)) {
+    return (
+      <AsyncState loading={loading} error={loadError} onRetry={reload} />
+    );
+  }
 
   return (
     <div className="template-builder">
       <div className="template-builder__topbar">
         <div className="template-builder__topbar-text">
           <Typography variant="h4" className="template-builder__title">
-            {isEditing ? "Editar modelo" : "Novo modelo de requerimento"}
+            {id ? "Editar template" : "Novo template"}
           </Typography>
-
           <Typography variant="body1" className="template-builder__subtitle">
-            Configure os dados principais e os campos que aparecerão no
-            formulário do aluno.
+            Configure os dados e os campos do formulário dinâmico.
           </Typography>
         </div>
-
-        <Button variant="contained" onClick={handleSave}>
-          {isEditing ? "Salvar alterações" : "Salvar modelo"}
+        <Button variant="contained" onClick={handleSave} disabled={saving}>
+          {saving ? "Salvando..." : "Salvar template"}
         </Button>
       </div>
+
+      {saveError && <Alert severity="error">{saveError}</Alert>}
 
       <div className="template-builder__layout">
         <div className="template-builder__main">
           <Card className="template-builder__card" elevation={0}>
             <CardContent className="template-builder__card-content">
               <Typography variant="h6">Informações gerais</Typography>
-
               <div className="template-builder__field-grid">
                 <TextField
-                  label="Nome do modelo"
+                  label="Nome"
                   value={template.name}
                   onChange={(event) =>
-                    updateTemplate({ name: event.target.value })
+                    setTemplate((current) => ({
+                      ...current,
+                      name: event.target.value,
+                    }))
                   }
+                  required
                   fullWidth
                 />
-
                 <TextField
                   select
                   label="Categoria"
                   value={template.category}
                   onChange={(event) =>
-                    updateTemplate({ category: event.target.value })
+                    setTemplate((current) => ({
+                      ...current,
+                      category: event.target.value,
+                    }))
                   }
+                  required
                   fullWidth
                 >
                   {TEMPLATE_CATEGORIES.map((category) => (
@@ -256,17 +303,33 @@ function TemplateBuilderPage() {
                     </MenuItem>
                   ))}
                 </TextField>
-
                 <TextField
                   className="template-builder__field-grid-full"
                   label="Descrição"
                   value={template.description}
                   onChange={(event) =>
-                    updateTemplate({ description: event.target.value })
+                    setTemplate((current) => ({
+                      ...current,
+                      description: event.target.value,
+                    }))
                   }
                   multiline
                   minRows={3}
                   fullWidth
+                />
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={template.active}
+                      onChange={(event) =>
+                        setTemplate((current) => ({
+                          ...current,
+                          active: event.target.checked,
+                        }))
+                      }
+                    />
+                  }
+                  label="Template ativo"
                 />
               </div>
             </CardContent>
@@ -275,216 +338,239 @@ function TemplateBuilderPage() {
           <Card className="template-builder__card" elevation={0}>
             <CardContent className="template-builder__card-content">
               <div className="template-builder__topbar">
-                <div className="template-builder__topbar-text">
+                <div>
                   <Typography variant="h6">Campos do formulário</Typography>
-                  <Typography
-                    variant="body2"
-                    className="template-builder__subtitle"
-                  >
-                    Defina a ordem, o tipo e as regras de preenchimento de cada
-                    campo.
+                  <Typography variant="body2" className="template-builder__subtitle">
+                    A posição determina a ordem exibida ao usuário.
                   </Typography>
                 </div>
-
                 <Button
                   variant="outlined"
                   startIcon={<Plus size={18} />}
-                  onClick={handleAddField}
+                  onClick={addField}
                 >
                   Adicionar campo
                 </Button>
               </div>
 
-              {template.fields.length === 0 ? (
+              {fields.length === 0 ? (
                 <div className="template-builder__empty-state">
-                  <div className="template-builder__empty-icon">
-                    <FileText size={28} />
-                  </div>
-
-                  <Typography
-                    variant="h6"
-                    className="template-builder__empty-title"
-                  >
-                    Nenhum campo configurado
-                  </Typography>
-
-                  <Typography
-                    variant="body2"
-                    className="template-builder__empty-subtitle"
-                  >
-                    Comece adicionando o primeiro campo do formulário.
-                  </Typography>
-
-                  <Button
-                    variant="contained"
-                    startIcon={<Plus size={18} />}
-                    onClick={handleAddField}
-                  >
+                  <FileText size={32} />
+                  <Typography variant="h6">Nenhum campo configurado</Typography>
+                  <Button variant="contained" onClick={addField}>
                     Criar primeiro campo
                   </Button>
                 </div>
               ) : (
                 <div className="template-builder__fields">
-                  {template.fields.map((field, index) => (
-                    <Accordion
-                      key={field.id}
-                      expanded={expandedFieldId === field.id}
-                      onChange={(_, expanded) =>
-                        setExpandedFieldId(expanded ? field.id : false)
-                      }
-                      className="template-builder__accordion"
-                      disableGutters
-                      elevation={0}
-                    >
-                      <AccordionSummary
-                        expandIcon={<ChevronDown size={18} />}
-                        className="template-builder__accordion-summary"
+                  {fields.map((field, index) => {
+                    const invalidKey =
+                      Boolean(field.fieldKey) &&
+                      !FIELD_KEY_PATTERN.test(field.fieldKey);
+                    const duplicateKey = duplicateKeys.has(field.fieldKey);
+
+                    return (
+                      <Accordion
+                        key={field.clientId}
+                        expanded={expandedId === field.clientId}
+                        onChange={(_, expanded) =>
+                          setExpandedId(expanded ? field.clientId : false)
+                        }
+                        className="template-builder__accordion"
+                        disableGutters
+                        elevation={0}
                       >
-                        <div className="template-builder__accordion-left">
-                          <GripVertical
-                            size={18}
-                            className="template-builder__drag-icon"
-                          />
-
-                          <div className="template-builder__accordion-text">
-                            <div className="template-builder__accordion-title-row">
-                              <Typography
-                                variant="body1"
-                                className="template-builder__field-title"
-                              >
-                                {field.label || `Campo ${index + 1}`}
-                              </Typography>
-
-                              <Chip
-                                label={getFieldTypeLabel(field.type)}
-                                size="small"
-                                variant="outlined"
-                              />
-
-                              {field.required && (
+                        <AccordionSummary expandIcon={<ChevronDown size={18} />}>
+                          <div className="template-builder__accordion-left">
+                            <div className="template-builder__accordion-text">
+                              <div className="template-builder__accordion-title-row">
+                                <Typography className="template-builder__field-title">
+                                  {field.label || `Campo ${index + 1}`}
+                                </Typography>
                                 <Chip
-                                  label="Obrigatório"
+                                  label={
+                                    FIELD_TYPES.find(
+                                      (type) => type.value === field.type,
+                                    )?.label
+                                  }
                                   size="small"
-                                  color="error"
-                                  variant="outlined"
                                 />
-                              )}
+                              </div>
+                              <Typography variant="body2">
+                                {field.fieldKey || "Chave não definida"}
+                              </Typography>
                             </div>
-
-                            <Typography
-                              variant="body2"
-                              className="template-builder__field-type"
-                            >
-                              {field.fieldKey || "Defina um identificador para o campo"}
-                            </Typography>
                           </div>
-                        </div>
-
-                        <div className="template-builder__accordion-actions">
                           <IconButton
-                            className="template-builder__delete-button"
+                            aria-label={`Remover ${field.label || `campo ${index + 1}`}`}
+                            color="error"
                             onClick={(event) => {
                               event.stopPropagation();
-                              handleDeleteField(field.id);
+                              removeField(field.clientId);
                             }}
-                            size="small"
-                            aria-label={`Excluir campo ${field.label || index + 1}`}
                           >
-                            <Trash2 size={16} />
+                            <Trash2 size={17} />
                           </IconButton>
-                        </div>
-                      </AccordionSummary>
+                        </AccordionSummary>
 
-                      <AccordionDetails className="template-builder__accordion-details">
-                        <div className="template-builder__field-grid">
-                          <TextField
-                            label="Rótulo"
-                            value={field.label}
-                            onChange={(event) =>
-                              handleFieldLabelChange(field.id, event.target.value)
-                            }
-                            fullWidth
-                          />
-
-                          <TextField
-                            select
-                            label="Tipo"
-                            value={field.type}
-                            onChange={(event) =>
-                              handleFieldTypeChange(
-                                field.id,
-                                event.target.value as FieldType
-                              )
-                            }
-                            fullWidth
-                          >
-                            {FIELD_TYPES.map((item) => (
-                              <MenuItem key={item.value} value={item.value}>
-                                {item.label}
-                              </MenuItem>
-                            ))}
-                          </TextField>
-
-                          <TextField
-                            label="Identificador"
-                            value={field.fieldKey}
-                            onChange={(event) =>
-                              updateField(field.id, { fieldKey: event.target.value })
-                            }
-                            fullWidth
-                          />
-
-                          <TextField
-                            label="Placeholder"
-                            value={field.placeholder ?? ""}
-                            onChange={(event) =>
-                              updateField(field.id, {
-                                placeholder: event.target.value,
-                              })
-                            }
-                            disabled={field.type === "checkbox" || field.type === "file"}
-                            fullWidth
-                          />
-
-                          <TextField
-                            className="template-builder__field-grid-full"
-                            label="Descrição de apoio"
-                            value={field.description ?? ""}
-                            onChange={(event) =>
-                              updateField(field.id, {
-                                description: event.target.value,
-                              })
-                            }
-                            multiline
-                            minRows={2}
-                            fullWidth
-                          />
-
-                          {field.type === "select" && (
+                        <AccordionDetails className="template-builder__accordion-details">
+                          <div className="template-builder__field-grid">
                             <TextField
-                              className="template-builder__field-grid-full"
-                              label="Opções"
-                              helperText="Uma opção por linha"
-                              value={
-                                field.options?.map((option) => option.label).join("\n") ??
-                                ""
-                              }
-                              onChange={(event) =>
-                                handleOptionsChange(field.id, event.target.value)
-                              }
-                              multiline
-                              minRows={4}
+                              label="Rótulo"
+                              value={field.label}
+                              onChange={(event) => {
+                                const label = event.target.value;
+                                updateField(field.clientId, {
+                                  label,
+                                  ...(!field.fieldKey
+                                    ? { fieldKey: slugify(label) }
+                                    : {}),
+                                });
+                              }}
+                              required
                               fullWidth
                             />
-                          )}
+                            <TextField
+                              select
+                              label="Tipo"
+                              value={field.type}
+                              onChange={(event) =>
+                                updateField(field.clientId, {
+                                  type: event.target.value as FieldType,
+                                })
+                              }
+                              fullWidth
+                            >
+                              {FIELD_TYPES.map((type) => (
+                                <MenuItem key={type.value} value={type.value}>
+                                  {type.label}
+                                </MenuItem>
+                              ))}
+                            </TextField>
+                            <TextField
+                              label="fieldKey"
+                              value={field.fieldKey}
+                              onChange={(event) =>
+                                updateField(field.clientId, {
+                                  fieldKey: event.target.value,
+                                })
+                              }
+                              error={invalidKey || duplicateKey}
+                              helperText={
+                                duplicateKey
+                                  ? "Chave duplicada"
+                                  : invalidKey
+                                    ? "Use apenas a-z, 0-9 e _"
+                                    : "Ex.: motivo_solicitacao"
+                              }
+                              required
+                              fullWidth
+                            />
+                            <TextField
+                              label="Posição"
+                              type="number"
+                              value={field.position}
+                              onChange={(event) =>
+                                updateField(field.clientId, {
+                                  position: Number(event.target.value),
+                                })
+                              }
+                              slotProps={{ htmlInput: { min: 1, step: 1 } }}
+                              required
+                              fullWidth
+                            />
+                            <TextField
+                              label="Placeholder"
+                              value={field.placeholder ?? ""}
+                              onChange={(event) =>
+                                updateField(field.clientId, {
+                                  placeholder: event.target.value,
+                                })
+                              }
+                              fullWidth
+                            />
+                            <TextField
+                              label="Descrição"
+                              value={field.description ?? ""}
+                              onChange={(event) =>
+                                updateField(field.clientId, {
+                                  description: event.target.value,
+                                })
+                              }
+                              fullWidth
+                            />
 
-                          <div className="template-builder__field-grid-full">
+                            {field.type === "select" && (
+                              <div className="template-builder__options">
+                                <Typography variant="subtitle2">
+                                  Opções do select
+                                </Typography>
+                                {(field.options ?? []).map((option, optionIndex) => (
+                                  <div
+                                    className="template-builder__option-row"
+                                    key={`${field.clientId}-${optionIndex}`}
+                                  >
+                                    <TextField
+                                      label="Label"
+                                      value={option.label}
+                                      onChange={(event) =>
+                                        updateOption(field.clientId, optionIndex, {
+                                          label: event.target.value,
+                                        })
+                                      }
+                                      required
+                                      fullWidth
+                                    />
+                                    <TextField
+                                      label="Value"
+                                      value={option.value}
+                                      onChange={(event) =>
+                                        updateOption(field.clientId, optionIndex, {
+                                          value: event.target.value,
+                                        })
+                                      }
+                                      required
+                                      fullWidth
+                                    />
+                                    <IconButton
+                                      aria-label="Remover opção"
+                                      color="error"
+                                      onClick={() =>
+                                        updateField(field.clientId, {
+                                          options: field.options?.filter(
+                                            (_, currentIndex) =>
+                                              currentIndex !== optionIndex,
+                                          ),
+                                        })
+                                      }
+                                    >
+                                      <Trash2 size={17} />
+                                    </IconButton>
+                                  </div>
+                                ))}
+                                <Button
+                                  size="small"
+                                  startIcon={<Plus size={16} />}
+                                  onClick={() =>
+                                    updateField(field.clientId, {
+                                      options: [
+                                        ...(field.options ?? []),
+                                        { label: "", value: "" },
+                                      ],
+                                    })
+                                  }
+                                >
+                                  Adicionar opção
+                                </Button>
+                              </div>
+                            )}
+
                             <FormControlLabel
                               control={
                                 <Switch
                                   checked={field.required}
                                   onChange={(event) =>
-                                    updateField(field.id, {
+                                    updateField(field.clientId, {
                                       required: event.target.checked,
                                     })
                                   }
@@ -493,10 +579,10 @@ function TemplateBuilderPage() {
                               label="Campo obrigatório"
                             />
                           </div>
-                        </div>
-                      </AccordionDetails>
-                    </Accordion>
-                  ))}
+                        </AccordionDetails>
+                      </Accordion>
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
@@ -505,108 +591,28 @@ function TemplateBuilderPage() {
 
         <div className="template-builder__preview-column">
           <Card className="template-builder__card" elevation={0}>
-            <CardContent className="template-builder__card-content template-builder__preview-header">
-              <Typography variant="h6">Pré-visualização</Typography>
-            </CardContent>
-
             <CardContent className="template-builder__card-content">
-              {previewFields.length === 0 ? (
-                <Typography
-                  variant="body2"
-                  className="template-builder__preview-empty"
-                >
-                  O formulário aparecerá aqui assim que você criar campos.
-                </Typography>
-              ) : (
-                <div className="template-builder__preview">
-                  <div className="template-builder__preview-top">
-                    <Typography
-                      variant="h6"
-                      className="template-builder__preview-title"
-                    >
-                      {template.name || "Novo modelo de requerimento"}
+              <Typography variant="h6">Resumo</Typography>
+              <Typography variant="body1">
+                {template.name || "Template sem nome"}
+              </Typography>
+              <Typography variant="body2" className="template-builder__subtitle">
+                {fields.length} {fields.length === 1 ? "campo" : "campos"} •{" "}
+                {template.active ? "Ativo" : "Inativo"}
+              </Typography>
+              {[...fields]
+                .sort((a, b) => a.position - b.position)
+                .map((field) => (
+                  <div key={field.clientId} className="template-builder__preview-field">
+                    <Typography variant="body2" fontWeight={600}>
+                      {field.position}. {field.label || "Campo sem rótulo"}
+                      {field.required ? " *" : ""}
                     </Typography>
-
-                    <Typography
-                      variant="body2"
-                      className="template-builder__preview-description"
-                    >
-                      {template.description || "Adicione uma descrição para orientar o aluno."}
+                    <Typography variant="caption" color="text.secondary">
+                      {field.fieldKey || "sem_chave"} • {field.type}
                     </Typography>
                   </div>
-
-                  <div className="template-builder__preview-fields">
-                    {previewFields.map((field) => (
-                      <div
-                        key={field.id}
-                        className="template-builder__preview-field"
-                      >
-                        <Typography
-                          variant="body2"
-                          className="template-builder__preview-label"
-                        >
-                          {field.label || "Campo sem título"}
-                          {field.required && (
-                            <span className="template-builder__required-mark">
-                              *
-                            </span>
-                          )}
-                        </Typography>
-
-                        {field.description && (
-                          <Typography
-                            variant="caption"
-                            className="template-builder__preview-field-description"
-                          >
-                            {field.description}
-                          </Typography>
-                        )}
-
-                        {field.type === "textarea" ? (
-                          <TextField
-                            placeholder={field.placeholder}
-                            multiline
-                            minRows={3}
-                            disabled
-                            fullWidth
-                          />
-                        ) : field.type === "select" ? (
-                          <TextField select disabled fullWidth value="">
-                            <MenuItem value="">
-                              {field.options?.[0]?.label ?? "Sem opções"}
-                            </MenuItem>
-                          </TextField>
-                        ) : field.type === "checkbox" ? (
-                          <FormControlLabel
-                            control={<Switch disabled />}
-                            label="Exemplo de marcação"
-                          />
-                        ) : (
-                          <TextField
-                            type={
-                              field.type === "number" ||
-                              field.type === "email" ||
-                              field.type === "date"
-                                ? field.type
-                                : "text"
-                            }
-                            placeholder={field.placeholder}
-                            disabled
-                            fullWidth
-                          />
-                        )}
-                      </div>
-                    ))}
-                  </div>
-
-                  <Typography
-                    variant="caption"
-                    className="template-builder__preview-helper"
-                  >
-                    Visualização simplificada do formulário final.
-                  </Typography>
-                </div>
-              )}
+                ))}
             </CardContent>
           </Card>
         </div>
