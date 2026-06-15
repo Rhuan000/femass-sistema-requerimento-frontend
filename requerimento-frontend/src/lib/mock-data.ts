@@ -12,7 +12,7 @@ export const mockTemplates: RequestTemplate[] = [
     fields: [
       {
         id: "field-001",
-        name: "motivoTrancamento",
+        fieldKey: "motivo_trancamento",
         label: "Motivo do Trancamento",
         type: "textarea",
         required: true,
@@ -20,7 +20,7 @@ export const mockTemplates: RequestTemplate[] = [
       },
       {
         id: "field-002",
-        name: "periodoTrancamento",
+        fieldKey: "periodo_trancamento",
         label: "Período de Trancamento",
         type: "select",
         required: true,
@@ -32,13 +32,14 @@ export const mockTemplates: RequestTemplate[] = [
       },
       {
         id: "field-003",
-        name: "dataInicio",
+        fieldKey: "data_inicio",
         label: "Data de Início",
         type: "date",
         required: true,
       },
     ],
   },
+
   {
     id: "tmpl-002",
     name: "Segunda Chamada de Prova",
@@ -50,7 +51,7 @@ export const mockTemplates: RequestTemplate[] = [
     fields: [
       {
         id: "field-004",
-        name: "disciplina",
+        fieldKey: "disciplina",
         label: "Disciplina",
         type: "text",
         required: true,
@@ -58,7 +59,7 @@ export const mockTemplates: RequestTemplate[] = [
       },
       {
         id: "field-005",
-        name: "professorResponsavel",
+        fieldKey: "professor_responsavel",
         label: "Professor Responsável",
         type: "text",
         required: true,
@@ -66,14 +67,14 @@ export const mockTemplates: RequestTemplate[] = [
       },
       {
         id: "field-006",
-        name: "dataProvaOriginal",
+        fieldKey: "data_prova_original",
         label: "Data da Prova Original",
         type: "date",
         required: true,
       },
       {
         id: "field-007",
-        name: "justificativa",
+        fieldKey: "justificativa",
         label: "Justificativa",
         type: "textarea",
         required: true,
@@ -81,7 +82,7 @@ export const mockTemplates: RequestTemplate[] = [
       },
       {
         id: "field-008",
-        name: "documentoComprobatorio",
+        fieldKey: "documento_comprobatorio",
         label: "Documento Comprobatório",
         type: "file",
         required: true,
@@ -89,6 +90,7 @@ export const mockTemplates: RequestTemplate[] = [
       },
     ],
   },
+
   {
     id: "tmpl-003",
     name: "Declaração de Matrícula",
@@ -100,7 +102,7 @@ export const mockTemplates: RequestTemplate[] = [
     fields: [
       {
         id: "field-009",
-        name: "finalidade",
+        fieldKey: "finalidade",
         label: "Finalidade",
         type: "select",
         required: true,
@@ -113,7 +115,7 @@ export const mockTemplates: RequestTemplate[] = [
       },
       {
         id: "field-010",
-        name: "quantidadeCopias",
+        fieldKey: "quantidade_copias",
         label: "Quantidade de Cópias",
         type: "number",
         required: true,
@@ -121,7 +123,7 @@ export const mockTemplates: RequestTemplate[] = [
       },
       {
         id: "field-011",
-        name: "observacoes",
+        fieldKey: "observacoes",
         label: "Observações",
         type: "textarea",
         required: false,
@@ -129,6 +131,7 @@ export const mockTemplates: RequestTemplate[] = [
       },
     ],
   },
+
   {
     id: "tmpl-004",
     name: "Aproveitamento de Disciplina",
@@ -140,7 +143,7 @@ export const mockTemplates: RequestTemplate[] = [
     fields: [
       {
         id: "field-012",
-        name: "disciplinaAproveitada",
+        fieldKey: "disciplina_aproveitada",
         label: "Disciplina a ser Aproveitada",
         type: "text",
         required: true,
@@ -148,7 +151,7 @@ export const mockTemplates: RequestTemplate[] = [
       },
       {
         id: "field-013",
-        name: "instituicaoOrigem",
+        fieldKey: "instituicao_origem",
         label: "Instituição de Origem",
         type: "text",
         required: true,
@@ -156,7 +159,7 @@ export const mockTemplates: RequestTemplate[] = [
       },
       {
         id: "field-014",
-        name: "cargaHoraria",
+        fieldKey: "carga_horaria",
         label: "Carga Horária",
         type: "number",
         required: true,
@@ -164,7 +167,7 @@ export const mockTemplates: RequestTemplate[] = [
       },
       {
         id: "field-015",
-        name: "notaObtida",
+        fieldKey: "nota_obtida",
         label: "Nota Obtida",
         type: "number",
         required: true,
@@ -172,7 +175,7 @@ export const mockTemplates: RequestTemplate[] = [
       },
       {
         id: "field-016",
-        name: "historicoEscolar",
+        fieldKey: "historico_escolar",
         label: "Histórico Escolar",
         type: "file",
         required: true,
@@ -180,7 +183,7 @@ export const mockTemplates: RequestTemplate[] = [
       },
       {
         id: "field-017",
-        name: "ementaDisciplina",
+        fieldKey: "ementa_disciplina",
         label: "Ementa da Disciplina",
         type: "file",
         required: true,
@@ -199,9 +202,9 @@ export const mockRequests: RequestRecord[] = [
     submittedAt: "2026-04-10",
     status: "pending",
     data: {
-      motivoTrancamento: "Questões de saúde pessoal.",
-      periodoTrancamento: "1_semestre",
-      dataInicio: "2026-05-01",
+      motivo_trancamento: "Questões de saúde pessoal.",
+      periodo_trancamento: "1_semestre",
+      data_inicio: "2026-05-01",
     },
   },
   {
@@ -213,8 +216,8 @@ export const mockRequests: RequestRecord[] = [
     status: "approved",
     data: {
       disciplina: "Cálculo II",
-      professorResponsavel: "Dr. Carlos Lima",
-      dataProvaOriginal: "2026-04-08",
+      professor_responsavel: "Dr. Carlos Lima",
+      data_prova_original: "2026-04-08",
       justificativa: "Internação hospitalar no dia da avaliação.",
     },
   },
@@ -227,22 +230,8 @@ export const mockRequests: RequestRecord[] = [
     status: "in_progress",
     data: {
       finalidade: "estagio",
-      quantidadeCopias: 2,
+      quantidade_copias: 2,
       observacoes: "Necessário para entrega no RH.",
-    },
-  },
-  {
-    id: "req-004",
-    templateId: "tmpl-004",
-    templateName: "Aproveitamento de Disciplina",
-    submittedBy: "Ana Beatriz",
-    submittedAt: "2026-04-13",
-    status: "rejected",
-    data: {
-      disciplinaAproveitada: "Banco de Dados I",
-      instituicaoOrigem: "Universidade Exemplo",
-      cargaHoraria: 80,
-      notaObtida: 7.8,
     },
   },
 ];

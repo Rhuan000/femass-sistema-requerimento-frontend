@@ -66,7 +66,7 @@ const slugifyFieldName = (label: string) =>
 
 const createEmptyField = (): FormField => ({
   id: createFieldId(),
-  name: "",
+  fieldKey: "",
   label: "",
   type: "text",
   required: false,
@@ -168,7 +168,7 @@ function TemplateBuilderPage() {
   const handleFieldLabelChange = (fieldId: string, label: string) => {
     updateField(fieldId, {
       label,
-      name: slugifyFieldName(label),
+      fieldKey: slugifyFieldName(label),
     });
   };
 
@@ -375,7 +375,7 @@ function TemplateBuilderPage() {
                               variant="body2"
                               className="template-builder__field-type"
                             >
-                              {field.name || "Defina um identificador para o campo"}
+                              {field.fieldKey || "Defina um identificador para o campo"}
                             </Typography>
                           </div>
                         </div>
@@ -427,9 +427,9 @@ function TemplateBuilderPage() {
 
                           <TextField
                             label="Identificador"
-                            value={field.name}
+                            value={field.fieldKey}
                             onChange={(event) =>
-                              updateField(field.id, { name: event.target.value })
+                              updateField(field.id, { fieldKey: event.target.value })
                             }
                             fullWidth
                           />
