@@ -1,8 +1,6 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { Search } from "lucide-react";
 import {
-  Button,
   Card,
   CardContent,
   Chip,
@@ -42,15 +40,14 @@ function statusColor(
 }
 
 function Answers({ submission }: { submission: Submission }) {
-  const entries = Object.entries(submission.data);
-  if (!entries.length) return <span>Nenhuma resposta</span>;
+  if (!submission.answers.length) return <span>Nenhuma resposta</span>;
 
   return (
     <dl className="requests-list__answers">
-      {entries.map(([key, value]) => (
-        <div key={key}>
-          <dt>{key}</dt>
-          <dd>{String(value ?? "")}</dd>
+      {submission.answers.map((answer) => (
+        <div key={answer.fieldKey}>
+          <dt>{answer.label}</dt>
+          <dd>{String(answer.value ?? "")}</dd>
         </div>
       ))}
     </dl>
@@ -58,7 +55,6 @@ function Answers({ submission }: { submission: Submission }) {
 }
 
 export function RequestsPage() {
-  const navigate = useNavigate();
   const { data: templates, loading: loadingTemplates, error: templatesError, reload } =
     useTemplates();
   const [templateId, setTemplateId] = useState("");
@@ -182,9 +178,6 @@ export function RequestsPage() {
                   <Typography variant="subtitle2">Respostas</Typography>
                   <Answers submission={submission} />
                 </div>
-                <Button onClick={() => navigate(`/requests/${submission.id}`)}>
-                  Consultar detalhes
-                </Button>
               </CardContent>
             </Card>
           ))}

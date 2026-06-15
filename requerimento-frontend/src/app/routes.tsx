@@ -5,7 +5,6 @@ import { TemplatesPage } from "../pages/templates/templates-page";
 import TemplateBuilderPage from "../pages/template-builder/template-builder-page";
 import { RequestsPage } from "../pages/requests/requests-page";
 import { RequestFormPage } from "../pages/request-form/request-form-page";
-import { SubmissionDetailsPage } from "../pages/submission-details/submission-details-page";
 import { AppLayout } from "./app-layout";
 
 export function AppRoutes() {
@@ -19,7 +18,6 @@ export function AppRoutes() {
           <Route path="/templates/edit/:id" element={<TemplateBuilderPage />} />
           <Route path="/requests" element={<RequestsPage />} />
           <Route path="/requests/new/:templateId" element={<RequestFormPage />} />
-          <Route path="/requests/:id" element={<SubmissionDetailsPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

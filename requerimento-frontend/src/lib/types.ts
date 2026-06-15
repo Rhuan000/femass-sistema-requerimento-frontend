@@ -50,6 +50,13 @@ export interface Submission {
   status: string;
   submittedAt: string;
   data: Record<string, unknown>;
+  answers: SubmissionAnswer[];
+}
+
+export interface SubmissionAnswer {
+  fieldKey: string;
+  label: string;
+  value: unknown;
 }
 
 export interface SubmissionInput {

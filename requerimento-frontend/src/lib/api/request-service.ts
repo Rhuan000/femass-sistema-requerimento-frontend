@@ -38,7 +38,6 @@ function normalizeSubmission(submission: Submission): Submission {
   const compatibleSubmission = submission as Submission & {
     createdAt?: string;
     submissionDate?: string;
-    answers?: Record<string, unknown>;
   };
 
   return {
@@ -48,7 +47,14 @@ function normalizeSubmission(submission: Submission): Submission {
       compatibleSubmission.createdAt ??
       compatibleSubmission.submissionDate ??
       "",
-    data: submission.data ?? compatibleSubmission.answers ?? {},
+    data: submission.data ?? {},
+    answers:
+      submission.answers ??
+      Object.entries(submission.data ?? {}).map(([fieldKey, value]) => ({
+        fieldKey,
+        label: fieldKey,
+        value,
+      })),
   };
 }
 
