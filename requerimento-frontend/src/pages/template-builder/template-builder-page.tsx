@@ -219,7 +219,7 @@ function TemplateBuilderPage() {
       fields: fields
         .map((field) => ({
           id: field.id,
-          campoId: field.campoId,
+          campoId: field.campoId.trim() || crypto.randomUUID(),
           label: field.label,
           type: field.type,
           required: field.required,
@@ -364,11 +364,6 @@ function TemplateBuilderPage() {
               ) : (
                 <div className="template-builder__fields">
                   {fields.map((field, index) => {
-                    const invalidKey =
-                      Boolean(field.campoId) &&
-                      !FIELD_KEY_PATTERN.test(field.campoId);
-                    const duplicateKey = duplicateKeys.has(field.campoId);
-
                     return (
                       <Accordion
                         key={field.clientId}
@@ -447,25 +442,6 @@ function TemplateBuilderPage() {
                                 </MenuItem>
                               ))}
                             </TextField>
-                            <TextField
-                              label="Campo ID"
-                              value={field.campoId}
-                              onChange={(event) =>
-                                updateField(field.clientId, {
-                                  campoId: event.target.value,
-                                })
-                              }
-                              error={invalidKey || duplicateKey}
-                              helperText={
-                                duplicateKey
-                                  ? "Chave duplicada"
-                                  : invalidKey
-                                    ? "Use apenas a-z, 0-9 e _"
-                                    : "Ex.: motivo_solicitacao"
-                              }
-                              required
-                              fullWidth
-                            />
                             <TextField
                               label="Posição"
                               type="number"
