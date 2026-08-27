@@ -35,7 +35,9 @@ interface EditableField extends TemplateField {
   clientId: string;
 }
 
-const FIELD_KEY_PATTERN = /^[a-z0-9_]+$/;
+const createCampoId = () =>
+  globalThis.crypto?.randomUUID?.() ??
+  `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
 const createClientId = () =>
   globalThis.crypto?.randomUUID?.() ??
@@ -43,7 +45,7 @@ const createClientId = () =>
 
 const createField = (position: number): EditableField => ({
   clientId: createClientId(),
-  campoId: "",
+  campoId: createCampoId(),
   label: "",
   type: "text",
   required: false,
@@ -172,28 +174,6 @@ function TemplateBuilderPage() {
     if (!template.category.trim()) return "Informe a categoria.";
     if (fields.length === 0) return "Adicione pelo menos um campo.";
 
-    for (const field of fields) {
-      if (!field.label.trim()) return "Todos os campos precisam de um rótulo.";
-      if (!FIELD_KEY_PATTERN.test(field.campoId)) {
-        return `A chave "${field.campoId || "(vazia)"}" deve conter apenas letras minúsculas, números e _.`;
-      }
-      if (duplicateKeys.has(field.campoId)) {
-        return `A chave "${field.campoId}" está duplicada.`;
-      }
-      if (!Number.isInteger(field.position) || field.position < 1) {
-        return `A posição do campo "${field.label}" deve ser um inteiro positivo.`;
-      }
-      if (
-        field.type === "select" &&
-        (!field.options?.length ||
-          field.options.some(
-            (option) => !option.label.trim() || !option.value.trim(),
-          ))
-      ) {
-        return `Preencha o label e o value de todas as opções de "${field.label}".`;
-      }
-    }
-
     const positions = fields.map((field) => field.position);
     if (new Set(positions).size !== positions.length) {
       return "As posições dos campos não podem se repetir.";
@@ -219,7 +199,7 @@ function TemplateBuilderPage() {
       fields: fields
         .map((field) => ({
           id: field.id,
-          campoId: field.campoId.trim() || crypto.randomUUID(),
+          campoId: field.campoId,
           label: field.label,
           type: field.type,
           required: field.required,
