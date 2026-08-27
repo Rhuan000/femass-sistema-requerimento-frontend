@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   Accordion,
@@ -113,20 +113,6 @@ function TemplateBuilderPage() {
 
     setInitializedId(id ?? null);
   }, [id, initializedId, loadedTemplate, loading]);
-
-  const duplicateKeys = useMemo(() => {
-    const counts = new Map<string, number>();
-    fields.forEach((field) => {
-      if (field.campoId) {
-        counts.set(field.campoId, (counts.get(field.campoId) ?? 0) + 1);
-      }
-    });
-    return new Set(
-      [...counts.entries()]
-        .filter(([, count]) => count > 1)
-        .map(([campoId]) => campoId),
-    );
-  }, [fields]);
 
   const updateField = (clientId: string, patch: Partial<EditableField>) => {
     setFields((current) =>
