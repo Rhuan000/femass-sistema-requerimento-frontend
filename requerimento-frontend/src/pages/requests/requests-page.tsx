@@ -45,7 +45,7 @@ function Answers({ submission }: { submission: Submission }) {
   return (
     <dl className="requests-list__answers">
       {submission.answers.map((answer) => (
-        <div key={answer.fieldKey}>
+        <div key={answer.campoId}>
           <dt>{answer.label}</dt>
           <dd>{String(answer.value ?? "")}</dd>
         </div>

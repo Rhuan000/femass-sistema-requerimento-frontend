@@ -50,9 +50,9 @@ function normalizeSubmission(submission: Submission): Submission {
     data: submission.data ?? {},
     answers:
       submission.answers ??
-      Object.entries(submission.data ?? {}).map(([fieldKey, value]) => ({
-        fieldKey,
-        label: fieldKey,
+      Object.entries(submission.data ?? {}).map(([campoId, value]) => ({
+        campoId,
+        label: campoId,
         value,
       })),
   };

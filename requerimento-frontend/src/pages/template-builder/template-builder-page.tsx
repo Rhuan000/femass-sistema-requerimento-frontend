@@ -122,7 +122,7 @@ function TemplateBuilderPage() {
     return new Set(
       [...counts.entries()]
         .filter(([, count]) => count > 1)
-        .map(([fieldKey]) => fieldKey),
+        .map(([campoId]) => campoId),
     );
   }, [fields]);
 

@@ -32,14 +32,14 @@ function toSubmissionData(
 ) {
   return Object.fromEntries(
     fields.map((field) => {
-      const value = values[field.fieldKey] ?? "";
+      const value = values[field.campoId] ?? "";
       if (field.type === "date" && value) {
-        return [field.fieldKey, new Date(`${value}T00:00:00.000Z`).toISOString()];
+        return [field.campoId, new Date(`${value}T00:00:00.000Z`).toISOString()];
       }
       if (field.type === "number" && value !== "") {
-        return [field.fieldKey, Number(value)];
+        return [field.campoId, Number(value)];
       }
-      return [field.fieldKey, value];
+      return [field.campoId, value];
     }),
   );
 }
@@ -64,8 +64,8 @@ export function RequestFormPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submission, setSubmission] = useState<Submission | null>(null);
 
-  const updateField = (fieldKey: string, value: string) => {
-    setFormData((current) => ({ ...current, [fieldKey]: value }));
+  const updateField = (campoId: string, value: string) => {
+    setFormData((current) => ({ ...current, [campoId]: value }));
   };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -155,11 +155,11 @@ export function RequestFormPage() {
               </div>
 
               {template.fields.map((field) => {
-                const inputId = `field-${field.fieldKey}`;
-                const value = formData[field.fieldKey] ?? "";
+                const inputId = `field-${field.campoId}`;
+                const value = formData[field.campoId] ?? "";
 
                 return (
-                  <div key={field.fieldKey} className="request-form__field">
+                  <div key={field.campoId} className="request-form__field">
                     <label htmlFor={inputId} className="request-form__label">
                       {field.label}
                       {field.required && (
@@ -176,7 +176,7 @@ export function RequestFormPage() {
                         minRows={4}
                         value={value}
                         onChange={(event) =>
-                          updateField(field.fieldKey, event.target.value)
+                          updateField(field.campoId, event.target.value)
                         }
                         placeholder={field.placeholder}
                         required={field.required}
@@ -193,7 +193,7 @@ export function RequestFormPage() {
                           label={field.placeholder || "Selecione"}
                           value={value}
                           onChange={(event) =>
-                            updateField(field.fieldKey, event.target.value)
+                            updateField(field.campoId, event.target.value)
                           }
                         >
                           {(field.options ?? []).map((option) => (
@@ -209,7 +209,7 @@ export function RequestFormPage() {
                         type={field.type}
                         value={value}
                         onChange={(event) =>
-                          updateField(field.fieldKey, event.target.value)
+                          updateField(field.campoId, event.target.value)
                         }
                         placeholder={field.placeholder}
                         required={field.required}

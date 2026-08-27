@@ -13,7 +13,7 @@ export interface SelectOption {
 
 export interface TemplateField {
   id?: string;
-  uuid: string;
+  campoId: string;
   label: string;
   type: FieldType;
   required: boolean;
@@ -54,7 +54,7 @@ export interface Submission {
 }
 
 export interface SubmissionAnswer {
-  fieldKey: string;
+  campoId: string;
   label: string;
   value: unknown;
 }
