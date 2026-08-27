@@ -383,9 +383,6 @@ function TemplateBuilderPage() {
                                 const label = event.target.value;
                                 updateField(field.clientId, {
                                   label,
-                                  ...(!field.campoId
-                                    ? { campoId: slugify(label) }
-                                    : {}),
                                 });
                               }}
                               required
