@@ -152,6 +152,25 @@ function TemplateBuilderPage() {
     if (!template.category.trim()) return "Informe a categoria.";
     if (fields.length === 0) return "Adicione pelo menos um campo.";
 
+    for (const field of fields) {
+      if (!field.campoId) return "Todos os campos precisam de um identificador.";
+      if (!field.label.trim()) return "Todos os campos precisam de um rótulo.";
+      if (
+        field.type === "select" &&
+        (!field.options?.length ||
+          field.options.some(
+            (option) => !option.label.trim() || !option.value.trim(),
+          ))
+      ) {
+        return `Preencha o label e o value de todas as opções de "${field.label}".`;
+      }
+    }
+
+    const campoIds = fields.map((field) => field.campoId);
+    if (new Set(campoIds).size !== campoIds.length) {
+      return "Os identificadores dos campos não podem se repetir.";
+    }
+
     const positions = fields.map((field) => field.position);
     if (new Set(positions).size !== positions.length) {
       return "As posições dos campos não podem se repetir.";
@@ -350,7 +369,7 @@ function TemplateBuilderPage() {
                                 />
                               </div>
                               <Typography variant="body2">
-                                {field.campoId || "Chave não definida"}
+                                {field.campoId || "Identificador não definido"}
                               </Typography>
                             </div>
                           </div>
@@ -540,7 +559,7 @@ function TemplateBuilderPage() {
                       {field.required ? " *" : ""}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      {field.campoId || "sem_chave"} • {field.type}
+                      {field.campoId || "sem_identificador"} • {field.type}
                     </Typography>
                   </div>
                 ))}
