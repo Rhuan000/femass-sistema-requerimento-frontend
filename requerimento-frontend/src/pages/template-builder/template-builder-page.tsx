@@ -43,7 +43,7 @@ const createClientId = () =>
 
 const createField = (position: number): EditableField => ({
   clientId: createClientId(),
-  fieldKey: "",
+  campoId: "",
   label: "",
   type: "text",
   required: false,
@@ -115,8 +115,8 @@ function TemplateBuilderPage() {
   const duplicateKeys = useMemo(() => {
     const counts = new Map<string, number>();
     fields.forEach((field) => {
-      if (field.fieldKey) {
-        counts.set(field.fieldKey, (counts.get(field.fieldKey) ?? 0) + 1);
+      if (field.campoId) {
+        counts.set(field.campoId, (counts.get(field.campoId) ?? 0) + 1);
       }
     });
     return new Set(
@@ -174,11 +174,11 @@ function TemplateBuilderPage() {
 
     for (const field of fields) {
       if (!field.label.trim()) return "Todos os campos precisam de um rótulo.";
-      if (!FIELD_KEY_PATTERN.test(field.fieldKey)) {
-        return `A chave "${field.fieldKey || "(vazia)"}" deve conter apenas letras minúsculas, números e _.`;
+      if (!FIELD_KEY_PATTERN.test(field.campoId)) {
+        return `A chave "${field.campoId || "(vazia)"}" deve conter apenas letras minúsculas, números e _.`;
       }
-      if (duplicateKeys.has(field.fieldKey)) {
-        return `A chave "${field.fieldKey}" está duplicada.`;
+      if (duplicateKeys.has(field.campoId)) {
+        return `A chave "${field.campoId}" está duplicada.`;
       }
       if (!Number.isInteger(field.position) || field.position < 1) {
         return `A posição do campo "${field.label}" deve ser um inteiro positivo.`;
@@ -219,7 +219,7 @@ function TemplateBuilderPage() {
       fields: fields
         .map((field) => ({
           id: field.id,
-          fieldKey: field.fieldKey,
+          campoId: field.campoId,
           label: field.label,
           type: field.type,
           required: field.required,
@@ -365,9 +365,9 @@ function TemplateBuilderPage() {
                 <div className="template-builder__fields">
                   {fields.map((field, index) => {
                     const invalidKey =
-                      Boolean(field.fieldKey) &&
-                      !FIELD_KEY_PATTERN.test(field.fieldKey);
-                    const duplicateKey = duplicateKeys.has(field.fieldKey);
+                      Boolean(field.campoId) &&
+                      !FIELD_KEY_PATTERN.test(field.campoId);
+                    const duplicateKey = duplicateKeys.has(field.campoId);
 
                     return (
                       <Accordion
@@ -397,7 +397,7 @@ function TemplateBuilderPage() {
                                 />
                               </div>
                               <Typography variant="body2">
-                                {field.fieldKey || "Chave não definida"}
+                                {field.campoId || "Chave não definida"}
                               </Typography>
                             </div>
                           </div>
@@ -422,8 +422,8 @@ function TemplateBuilderPage() {
                                 const label = event.target.value;
                                 updateField(field.clientId, {
                                   label,
-                                  ...(!field.fieldKey
-                                    ? { fieldKey: slugify(label) }
+                                  ...(!field.campoId
+                                    ? { campoId: slugify(label) }
                                     : {}),
                                 });
                               }}
@@ -448,11 +448,11 @@ function TemplateBuilderPage() {
                               ))}
                             </TextField>
                             <TextField
-                              label="fieldKey"
-                              value={field.fieldKey}
+                              label="Campo ID"
+                              value={field.campoId}
                               onChange={(event) =>
                                 updateField(field.clientId, {
-                                  fieldKey: event.target.value,
+                                  campoId: event.target.value,
                                 })
                               }
                               error={invalidKey || duplicateKey}
@@ -609,7 +609,7 @@ function TemplateBuilderPage() {
                       {field.required ? " *" : ""}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      {field.fieldKey || "sem_chave"} • {field.type}
+                      {field.campoId || "sem_chave"} • {field.type}
                     </Typography>
                   </div>
                 ))}

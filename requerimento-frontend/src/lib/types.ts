@@ -13,7 +13,7 @@ export interface SelectOption {
 
 export interface TemplateField {
   id?: string;
-  fieldKey: string;
+  uuid: string;
   label: string;
   type: FieldType;
   required: boolean;
