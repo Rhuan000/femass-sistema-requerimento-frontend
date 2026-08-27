@@ -55,14 +55,6 @@ const createField = (position: number): EditableField => ({
   options: undefined,
 });
 
-const slugify = (value: string) =>
-  value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "");
-
 function TemplateBuilderPage() {
   const navigate = useNavigate();
   const { id } = useParams();
