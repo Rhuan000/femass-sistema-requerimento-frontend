@@ -1,8 +1,10 @@
+import keycloak from "../auth/keycloak";
+
 const API_URL = import.meta.env.VITE_API_URL;
 
 if (!API_URL) {
   throw new Error(
-    "VITE_API_URL não foi definida. Configure a URL da API no arquivo .env.",
+      "VITE_API_URL não foi definida. Configure a URL da API no arquivo .env.",
   );
 }
 
@@ -23,7 +25,8 @@ function extractErrorMessage(payload: unknown, fallback: string) {
 
   if (payload && typeof payload === "object") {
     const data = payload as Record<string, unknown>;
-    const possibleMessage = data.message ?? data.error ?? data.detail ?? data.title;
+    const possibleMessage =
+        data.message ?? data.error ?? data.detail ?? data.title;
 
     if (typeof possibleMessage === "string" && possibleMessage.trim()) {
       return possibleMessage;
@@ -31,15 +34,17 @@ function extractErrorMessage(payload: unknown, fallback: string) {
 
     if (Array.isArray(data.errors)) {
       const messages = data.errors
-        .map((error) => {
-          if (typeof error === "string") return error;
-          if (error && typeof error === "object") {
-            const item = error as Record<string, unknown>;
-            return item.message ?? item.defaultMessage;
-          }
-          return null;
-        })
-        .filter((message): message is string => typeof message === "string");
+          .map((error) => {
+            if (typeof error === "string") return error;
+            if (error && typeof error === "object") {
+              const item = error as Record<string, unknown>;
+              return item.message ?? item.defaultMessage;
+            }
+            return null;
+          })
+          .filter(
+              (message): message is string => typeof message === "string",
+          );
 
       if (messages.length) return messages.join(" ");
     }
@@ -57,29 +62,32 @@ async function parseResponse(response: Response): Promise<unknown> {
 }
 
 export async function apiRequest<T>(
-  path: string,
-  options: RequestInit = {},
+    path: string,
+    options: RequestInit = {},
 ): Promise<T> {
   let response: Response;
-  const token = localStorage.getItem("token") ?? import.meta.env.VITE_API_TOKEN;
   const isMultipart = options.body instanceof FormData;
 
   try {
+    await keycloak.updateToken(30);
+
     response = await fetch(`${API_URL.replace(/\/$/, "")}${path}`, {
       ...options,
       headers: {
         Accept: "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(options.body && !isMultipart
-          ? { "Content-Type": "application/json" }
-          : {}),
+            ? { "Content-Type": "application/json" }
+            : {}),
+        ...(keycloak.token
+            ? { Authorization: `Bearer ${keycloak.token}` }
+            : {}),
         ...options.headers,
       },
     });
   } catch {
     throw new ApiError(
-      "Não foi possível conectar à API. Verifique se o servidor está disponível.",
-      0,
+        "Não foi possível conectar à API. Verifique se o servidor está disponível.",
+        0,
     );
   }
 
@@ -87,11 +95,11 @@ export async function apiRequest<T>(
 
   if (!response.ok) {
     throw new ApiError(
-      extractErrorMessage(
-        payload,
-        `A API retornou o status ${response.status}. Tente novamente.`,
-      ),
-      response.status,
+        extractErrorMessage(
+            payload,
+            `A API retornou o status ${response.status}. Tente novamente.`,
+        ),
+        response.status,
     );
   }
 
@@ -100,6 +108,6 @@ export async function apiRequest<T>(
 
 export function getErrorMessage(error: unknown) {
   return error instanceof Error
-    ? error.message
-    : "Ocorreu um erro inesperado. Tente novamente.";
+      ? error.message
+      : "Ocorreu um erro inesperado. Tente novamente.";
 }
