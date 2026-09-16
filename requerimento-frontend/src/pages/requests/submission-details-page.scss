@@ -1,0 +1,163 @@
+@use "../../shared/styles/variables" as *;
+
+.submission-details {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.submission-details__header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+
+  @media (max-width: 767px) {
+    flex-direction: column;
+  }
+}
+
+.submission-details__heading {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.submission-details__title {
+  &.MuiTypography-root {
+    margin: 0;
+    color: $color-text;
+    font-weight: 700;
+  }
+}
+
+.submission-details__subtitle {
+  &.MuiTypography-root {
+    color: $color-text-light;
+  }
+}
+
+.submission-details__content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.submission-details__card {
+  &.MuiPaper-root {
+    border: 1px solid $color-border;
+    border-radius: 16px;
+    background: $color-surface;
+  }
+}
+
+.submission-details__summary {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.submission-details__id {
+  &.MuiTypography-root {
+    font-family: monospace;
+    color: $color-text-light;
+    overflow-wrap: anywhere;
+  }
+}
+
+.submission-details__metadata {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px 24px;
+  margin: 20px 0 0;
+
+  div {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  dt {
+    color: $color-text-light;
+    font-size: 13px;
+  }
+
+  dd {
+    margin: 0;
+    color: $color-text;
+    font-weight: 600;
+  }
+
+  @media (max-width: 575px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.submission-details__form-content,
+.submission-details__documents-content {
+  &.MuiCardContent-root {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+}
+
+.submission-details__fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+
+  .MuiTextField-root:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+
+  @media (max-width: 700px) {
+    grid-template-columns: 1fr;
+
+    .MuiTextField-root:last-child:nth-child(odd) {
+      grid-column: auto;
+    }
+  }
+}
+
+.submission-details__documents {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.submission-details__document {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid $color-border;
+  border-radius: $radius-sm;
+  color: $color-primary;
+
+  div {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+  }
+
+  strong,
+  span {
+    overflow-wrap: anywhere;
+  }
+
+  strong {
+    color: $color-text;
+  }
+
+  span {
+    color: $color-text-light;
+    font-size: 12px;
+  }
+}

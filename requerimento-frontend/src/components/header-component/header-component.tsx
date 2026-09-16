@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FileText, User } from "lucide-react";
+import { FileText, LogOut, User } from "lucide-react";
 import {
   Avatar,
   Divider,
@@ -8,10 +8,17 @@ import {
   Menu,
   MenuItem,
 } from "@mui/material";
+import { useAuth } from "../../lib/auth/auth-context";
 import "./header-style.scss";
 
 export function Header() {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const { logout, username } = useAuth();
+
+  const handleLogout = async () => {
+    setAnchorEl(null);
+    await logout();
+  };
 
   return (
     <header className="app-header">
@@ -43,12 +50,13 @@ export function Header() {
             onClose={() => setAnchorEl(null)}
           >
             <div className="app-header__menu-header">
-              <span className="app-header__menu-name">Usuário FeMASS</span>
+              <span className="app-header__menu-name">{username ?? "Usuário FeMASS"}</span>
               <span className="app-header__menu-email">Acesso ao sistema</span>
             </div>
             <Divider />
-            <MenuItem onClick={() => setAnchorEl(null)}>
-              <ListItemText>Fechar menu</ListItemText>
+            <MenuItem onClick={() => void handleLogout()}>
+              <LogOut size={18} aria-hidden="true" />
+              <ListItemText>Sair</ListItemText>
             </MenuItem>
           </Menu>
         </div>

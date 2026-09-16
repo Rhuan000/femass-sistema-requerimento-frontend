@@ -98,6 +98,37 @@ export async function apiRequest<T>(
   return payload as T;
 }
 
+export async function apiDownload(path: string): Promise<Blob> {
+  const token = localStorage.getItem("token") ?? import.meta.env.VITE_API_TOKEN;
+  let response: Response;
+
+  try {
+    response = await fetch(`${API_URL.replace(/\/$/, "")}${path}`, {
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+  } catch {
+    throw new ApiError(
+      "Não foi possível conectar à API. Verifique se o servidor está disponível.",
+      0,
+    );
+  }
+
+  if (!response.ok) {
+    const payload = await parseResponse(response);
+    throw new ApiError(
+      extractErrorMessage(
+        payload,
+        `A API retornou o status ${response.status}. Tente novamente.`,
+      ),
+      response.status,
+    );
+  }
+
+  return response.blob();
+}
+
 export function getErrorMessage(error: unknown) {
   return error instanceof Error
     ? error.message

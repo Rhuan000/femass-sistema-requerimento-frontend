@@ -1,0 +1,71 @@
+@use "../../shared/styles/variables" as *;
+
+.login-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 55%, #ecfdf5 100%);
+}
+
+.login-page__card {
+  &.MuiPaper-root {
+    width: min(100%, 460px);
+    border: 1px solid $color-border;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 24px 70px rgba(30, 64, 175, 0.12);
+  }
+}
+
+.login-page__content {
+  &.MuiCardContent-root {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    padding: 40px;
+  }
+}
+
+.login-page__mark {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border-radius: 12px;
+  background: $color-primary;
+  color: white;
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.login-page__eyebrow {
+  &.MuiTypography-root {
+    margin-top: 8px;
+    color: $color-primary;
+    font-weight: 700;
+  }
+}
+
+.login-page__title {
+  &.MuiTypography-root {
+    margin: 0;
+    color: $color-text;
+    font-weight: 800;
+  }
+}
+
+.login-page__description {
+  &.MuiTypography-root {
+    margin-bottom: 8px;
+    color: $color-text-light;
+  }
+}
+
+@media (max-width: 575px) {
+  .login-page__content {
+    &.MuiCardContent-root {
+      padding: 28px 24px;
+    }
+  }
+}

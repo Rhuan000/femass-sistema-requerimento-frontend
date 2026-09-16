@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import { Eye, Search } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import {
+  Button,
   Card,
   CardContent,
   Chip,
@@ -56,6 +58,7 @@ function Answers({ submission }: { submission: Submission }) {
 }
 
 export function RequestsPage() {
+  const navigate = useNavigate();
   const { data: templates, loading: loadingTemplates, error: templatesError, reload } =
     useTemplates();
   const [templateId, setTemplateId] = useState("");
@@ -79,10 +82,16 @@ export function RequestsPage() {
   const filtered = useMemo(() => {
     const query = search.toLocaleLowerCase("pt-BR").trim();
     return (submissions ?? []).filter(
-      (submission) =>
-        submission.id.toLocaleLowerCase("pt-BR").includes(query) ||
-        submission.submittedBy.toLocaleLowerCase("pt-BR").includes(query) ||
-        submission.status.toLocaleLowerCase("pt-BR").includes(query),
+      (submission) => {
+        const searchable = [
+          submission.id,
+          submission.submittedBy,
+          submission.status,
+        ]
+          .map((value) => String(value ?? "").toLocaleLowerCase("pt-BR"))
+          .join(" ");
+        return searchable.includes(query);
+      },
     );
   }, [search, submissions]);
 
@@ -168,7 +177,7 @@ export function RequestsPage() {
                 <div className="requests-list__metadata">
                   <div>
                     <span>Usuário</span>
-                    <strong>{submission.submittedBy}</strong>
+                    <strong>{submission.submittedBy || "Usuário autenticado"}</strong>
                   </div>
                   <div>
                     <span>Data</span>
@@ -179,6 +188,15 @@ export function RequestsPage() {
                   <Typography variant="subtitle2">Respostas</Typography>
                   <Answers submission={submission} />
                 </div>
+                <Button
+                  variant="outlined"
+                  startIcon={<Eye size={16} />}
+                  onClick={() =>
+                    navigate(`/requests/${submission.templateId}/${submission.id}`)
+                  }
+                >
+                  Ver requerimento completo
+                </Button>
               </CardContent>
             </Card>
           ))}
