@@ -1,0 +1,527 @@
+PROJETO - ESTRUTURA E CONTEÚDO
+
+ESTRUTURA DE PASTAS
+./
+  public/
+  src/
+  public/
+  src/
+    app/
+    assets/
+    components/
+    hooks/
+    lib/
+    pages/
+    shared/
+    app/
+    assets/
+    components/
+      async-state/
+      header-component/
+      mobileNav-component/
+      sidebar-component/
+      async-state/
+      header-component/
+      mobileNav-component/
+      sidebar-component/
+    hooks/
+    lib/
+      api/
+      api/
+    pages/
+      dashboard/
+      request-form/
+      requests/
+      template-builder/
+      templates/
+      dashboard/
+      request-form/
+      requests/
+      template-builder/
+      templates/
+    shared/
+      styles/
+      styles/
+
+
+CONTEÚDO DOS ARQUIVOS
+
+---
+
+ARQUIVO: README.md
+
+```md
+# React + TypeScript + Vite
+
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+
+Currently, two official plugins are available:
+
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+
+## React Compiler
+
+The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+
+## Expanding the ESLint configuration
+
+If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+
+```js
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{ts,tsx}'],
+    extends: [
+      // Other configs...
+
+      // Remove tseslint.configs.recommended and replace with this
+      tseslint.configs.recommendedTypeChecked,
+      // Alternatively, use this for stricter rules
+      tseslint.configs.strictTypeChecked,
+      // Optionally, add this for stylistic rules
+      tseslint.configs.stylisticTypeChecked,
+
+      // Other configs...
+    ],
+    languageOptions: {
+      parserOptions: {
+        project: ['./tsconfig.node.json', './tsconfig.app.json'],
+        tsconfigRootDir: import.meta.dirname,
+      },
+      // other options...
+    },
+  },
+])
+```
+
+You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+
+```js
+// eslint.config.js
+import reactX from 'eslint-plugin-react-x'
+import reactDom from 'eslint-plugin-react-dom'
+
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{ts,tsx}'],
+    extends: [
+      // Other configs...
+      // Enable lint rules for React
+      reactX.configs['recommended-typescript'],
+      // Enable lint rules for React DOM
+      reactDom.configs.recommended,
+    ],
+    languageOptions: {
+      parserOptions: {
+        project: ['./tsconfig.node.json', './tsconfig.app.json'],
+        tsconfigRootDir: import.meta.dirname,
+      },
+      // other options...
+    },
+  },
+])
+```
+```
+
+---
+
+ARQUIVO: projeto.txt
+
+```txt
+
+```
+
+---
+
+ARQUIVO: src\hooks\use-async.ts
+
+```ts
+import { useCallback, useEffect, useRef, useState } from "react";
+import { getErrorMessage } from "../lib/api/http-client";
+
+export function useAsync<T>(
+  loader: () => Promise<T>,
+  requestKey = "",
+) {
+  const [data, setData] = useState<T | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const loaderRef = useRef(loader);
+  loaderRef.current = loader;
+
+  const load = useCallback(async () => {
+    void requestKey;
+    setLoading(true);
+    setError(null);
+
+    try {
+      setData(await loaderRef.current());
+    } catch (loadError) {
+      setError(getErrorMessage(loadError));
+    } finally {
+      setLoading(false);
+    }
+  }, [requestKey]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  return { data, loading, error, reload: load, setData };
+}
+```
+
+---
+
+ARQUIVO: src\hooks\use-templates.ts
+
+```ts
+import { requestService } from "../lib/api/request-service";
+import { useAsync } from "./use-async";
+
+export function useTemplates() {
+  return useAsync(() => requestService.listTemplates());
+}
+
+export function useTemplate(id?: string) {
+  return useAsync(
+    () => {
+      if (!id) return Promise.reject(new Error("Template não informado."));
+      return requestService.getTemplate(id);
+    },
+    id,
+  );
+}
+```
+
+---
+
+ARQUIVO: src\lib\api\http-client.ts
+
+```ts
+const API_URL = import.meta.env.VITE_API_URL;
+
+if (!API_URL) {
+  throw new Error(
+    "VITE_API_URL não foi definida. Configure a URL da API no arquivo .env.",
+  );
+}
+
+export class ApiError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
+function extractErrorMessage(payload: unknown, fallback: string) {
+  if (typeof payload === "string" && payload.trim()) {
+    return payload;
+  }
+
+  if (payload && typeof payload === "object") {
+    const data = payload as Record<string, unknown>;
+    const possibleMessage = data.message ?? data.error ?? data.detail ?? data.title;
+
+    if (typeof possibleMessage === "string" && possibleMessage.trim()) {
+      return possibleMessage;
+    }
+
+    if (Array.isArray(data.errors)) {
+      const messages = data.errors
+        .map((error) => {
+          if (typeof error === "string") return error;
+          if (error && typeof error === "object") {
+            const item = error as Record<string, unknown>;
+            return item.message ?? item.defaultMessage;
+          }
+          return null;
+        })
+        .filter((message): message is string => typeof message === "string");
+
+      if (messages.length) return messages.join(" ");
+    }
+  }
+
+  return fallback;
+}
+
+async function parseResponse(response: Response): Promise<unknown> {
+  const contentType = response.headers.get("content-type") ?? "";
+
+  if (response.status === 204) return undefined;
+  if (contentType.includes("application/json")) return response.json();
+  return response.text();
+}
+
+export async function apiRequest<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
+  let response: Response;
+
+  try {
+    response = await fetch(`${API_URL.replace(/\/$/, "")}${path}`, {
+      ...options,
+      headers: {
+        Accept: "application/json",
+        ...(options.body ? { "Content-Type": "application/json" } : {}),
+        ...options.headers,
+      },
+    });
+  } catch {
+    throw new ApiError(
+      "Não foi possível conectar à API. Verifique se o servidor está disponível.",
+      0,
+    );
+  }
+
+  const payload = await parseResponse(response);
+
+  if (!response.ok) {
+    throw new ApiError(
+      extractErrorMessage(
+        payload,
+        `A API retornou o status ${response.status}. Tente novamente.`,
+      ),
+      response.status,
+    );
+  }
+
+  return payload as T;
+}
+
+export function getErrorMessage(error: unknown) {
+  return error instanceof Error
+    ? error.message
+    : "Ocorreu um erro inesperado. Tente novamente.";
+}
+```
+
+---
+
+ARQUIVO: src\lib\api\request-service.ts
+
+```ts
+import type {
+  Submission,
+  SubmissionInput,
+  Template,
+  TemplateInput,
+} from "../types";
+import { apiRequest } from "./http-client";
+
+function unwrapList<T>(payload: unknown): T[] {
+  if (Array.isArray(payload)) return payload as T[];
+  if (!payload || typeof payload !== "object") return [];
+
+  const data = payload as Record<string, unknown>;
+  const possibleList = data.content ?? data.items ?? data.data ?? data.results;
+  return Array.isArray(possibleList) ? (possibleList as T[]) : [];
+}
+
+function unwrapObject<T>(payload: unknown): T {
+  if (payload && typeof payload === "object") {
+    const data = payload as Record<string, unknown>;
+    const nested = data.data ?? data.item ?? data.result;
+    if (nested && typeof nested === "object") return nested as T;
+  }
+  return payload as T;
+}
+
+function normalizeTemplate(template: Template & { isActive?: boolean }): Template {
+  return {
+    ...template,
+    active: template.active ?? template.isActive ?? true,
+    fields: Array.isArray(template.fields)
+      ? [...template.fields].sort((a, b) => a.position - b.position)
+      : [],
+  };
+}
+
+function normalizeSubmission(submission: Submission): Submission {
+  const compatibleSubmission = submission as Submission & {
+    createdAt?: string;
+    submissionDate?: string;
+  };
+
+  return {
+    ...submission,
+    submittedAt:
+      submission.submittedAt ??
+      compatibleSubmission.createdAt ??
+      compatibleSubmission.submissionDate ??
+      "",
+    data: submission.data ?? {},
+    answers:
+      submission.answers ??
+      Object.entries(submission.data ?? {}).map(([fieldKey, value]) => ({
+        fieldKey,
+        label: fieldKey,
+        value,
+      })),
+  };
+}
+
+export const requestService = {
+  async listTemplates() {
+    const payload = await apiRequest<unknown>("/templates");
+    return unwrapList<Template & { isActive?: boolean }>(payload).map(
+      normalizeTemplate,
+    );
+  },
+
+  async getTemplate(id: string) {
+    const payload = await apiRequest<unknown>(`/templates/${id}`);
+    return normalizeTemplate(
+      unwrapObject<Template & { isActive?: boolean }>(payload),
+    );
+  },
+
+  createTemplate(input: TemplateInput) {
+    return apiRequest<Template>("/templates", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  },
+
+  updateTemplate(id: string, input: TemplateInput) {
+    return apiRequest<Template>(`/templates/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(input),
+    });
+  },
+
+  createSubmission(input: SubmissionInput) {
+    return apiRequest<Submission>("/submissions", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  },
+
+  async listSubmissionsByTemplate(templateId: string) {
+    const payload = await apiRequest<unknown>(
+      `/submissions/template/${templateId}`,
+    );
+    return unwrapList<Submission>(payload).map(normalizeSubmission);
+  },
+
+  async getSubmission(id: string) {
+    const payload = await apiRequest<unknown>(`/submissions/${id}`);
+    return normalizeSubmission(unwrapObject<Submission>(payload));
+  },
+};
+```
+
+---
+
+ARQUIVO: src\lib\types.ts
+
+```ts
+export type FieldType =
+  | "text"
+  | "email"
+  | "number"
+  | "date"
+  | "select"
+  | "textarea";
+
+export interface SelectOption {
+  label: string;
+  value: string;
+}
+
+export interface TemplateField {
+  id?: string;
+  fieldKey: string;
+  label: string;
+  type: FieldType;
+  required: boolean;
+  placeholder?: string;
+  description?: string;
+  position: number;
+  options?: SelectOption[];
+}
+
+export interface Template {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  active: boolean;
+  fields: TemplateField[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface TemplateInput {
+  name: string;
+  description: string;
+  category: string;
+  active: boolean;
+  fields: TemplateField[];
+}
+
+export interface Submission {
+  id: string;
+  templateId: string;
+  templateName?: string;
+  submittedBy: string;
+  status: string;
+  submittedAt: string;
+  data: Record<string, unknown>;
+  answers: SubmissionAnswer[];
+}
+
+export interface SubmissionAnswer {
+  fieldKey: string;
+  label: string;
+  value: unknown;
+}
+
+export interface SubmissionInput {
+  templateId: string;
+  submittedBy: string;
+  data: Record<string, unknown>;
+}
+
+export const FIELD_TYPES: Array<{ value: FieldType; label: string }> = [
+  { value: "text", label: "Texto curto" },
+  { value: "email", label: "E-mail" },
+  { value: "number", label: "Número" },
+  { value: "date", label: "Data" },
+  { value: "select", label: "Seleção" },
+  { value: "textarea", label: "Texto longo" },
+];
+
+export const TEMPLATE_CATEGORIES = [
+  "Acadêmico",
+  "Financeiro",
+  "Documentos",
+  "Estágio",
+  "TCC",
+  "Outros",
+];
+```
+
+---
+
+ARQUIVO: vite.config.ts
+
+```ts
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+// https://vite.dev/config/
+export default defineConfig({
+  plugins: [react()],
+})
+```
+

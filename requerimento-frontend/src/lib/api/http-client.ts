@@ -61,13 +61,18 @@ export async function apiRequest<T>(
   options: RequestInit = {},
 ): Promise<T> {
   let response: Response;
+  const token = localStorage.getItem("token") ?? import.meta.env.VITE_API_TOKEN;
+  const isMultipart = options.body instanceof FormData;
 
   try {
     response = await fetch(`${API_URL.replace(/\/$/, "")}${path}`, {
       ...options,
       headers: {
         Accept: "application/json",
-        ...(options.body ? { "Content-Type": "application/json" } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(options.body && !isMultipart
+          ? { "Content-Type": "application/json" }
+          : {}),
         ...options.headers,
       },
     });

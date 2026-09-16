@@ -1,5 +1,6 @@
 import type {
   Submission,
+  SubmissionDocument,
   SubmissionInput,
   Template,
   TemplateInput,
@@ -55,6 +56,7 @@ function normalizeSubmission(submission: Submission): Submission {
         label: campoId,
         value,
       })),
+    documentos: submission.documentos ?? [],
   };
 }
 
@@ -92,6 +94,36 @@ export const requestService = {
       method: "POST",
       body: JSON.stringify(input),
     });
+  },
+
+  updateSubmission(id: string, data: Record<string, unknown>) {
+    return apiRequest<Submission>(`/submissions/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({ data }),
+    });
+  },
+
+  uploadDocument(id: string, file: File) {
+    const formData = new FormData();
+    formData.append("file", file);
+    return apiRequest<SubmissionDocument>(`/submissions/${id}/documents`, {
+      method: "POST",
+      body: formData,
+    });
+  },
+
+  deleteDocument(submissionId: string, documentId: string) {
+    return apiRequest<void>(
+      `/submissions/${submissionId}/documents/${documentId}`,
+      { method: "DELETE" },
+    );
+  },
+
+  submitSubmission(id: string) {
+    return apiRequest<Pick<Submission, "id" | "status" | "submittedAt">>(
+      `/submissions/${id}/submit`,
+      { method: "POST" },
+    );
   },
 
   async listSubmissionsByTemplate(templateId: string) {

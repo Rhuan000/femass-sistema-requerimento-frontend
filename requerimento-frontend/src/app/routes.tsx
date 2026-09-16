@@ -18,6 +18,10 @@ export function AppRoutes() {
           <Route path="/templates/edit/:id" element={<TemplateBuilderPage />} />
           <Route path="/requests" element={<RequestsPage />} />
           <Route path="/requests/new/:templateId" element={<RequestFormPage />} />
+          <Route
+            path="/requests/new/:templateId/:submissionId"
+            element={<RequestFormPage />}
+          />
         </Route>
       </Routes>
     </BrowserRouter>

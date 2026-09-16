@@ -48,9 +48,21 @@ export interface Submission {
   templateName?: string;
   submittedBy: string;
   status: string;
-  submittedAt: string;
+  submittedAt: string | null;
+  createdAt?: string;
+  updatedAt?: string;
   data: Record<string, unknown>;
   answers: SubmissionAnswer[];
+  documentos: SubmissionDocument[];
+}
+
+export interface SubmissionDocument {
+  id: string;
+  submissionId: string;
+  nomeOriginal: string;
+  contentType: string;
+  tamanho: number;
+  createdAt: string;
 }
 
 export interface SubmissionAnswer {
@@ -61,7 +73,6 @@ export interface SubmissionAnswer {
 
 export interface SubmissionInput {
   templateId: string;
-  submittedBy: string;
   data: Record<string, unknown>;
 }
 

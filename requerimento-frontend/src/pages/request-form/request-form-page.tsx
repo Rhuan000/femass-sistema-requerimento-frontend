@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Send } from "lucide-react";
+import { ArrowLeft, Paperclip, Send, Trash2 } from "lucide-react";
 import {
   Alert,
   Button,
@@ -23,7 +23,7 @@ import { AsyncState } from "../../components/async-state/async-state";
 import { useTemplate } from "../../hooks/use-templates";
 import { getErrorMessage } from "../../lib/api/http-client";
 import { requestService } from "../../lib/api/request-service";
-import type { Submission, TemplateField } from "../../lib/types";
+import type { Submission, SubmissionDocument, TemplateField } from "../../lib/types";
 import "./request-form-style.scss";
 
 function toSubmissionData(
@@ -44,7 +44,8 @@ function toSubmissionData(
   );
 }
 
-function formatDate(value: string) {
+function formatDate(value: string | null) {
+  if (!value) return "Ainda não enviado";
   const date = new Date(value);
   return Number.isNaN(date.getTime())
     ? value
@@ -54,18 +55,132 @@ function formatDate(value: string) {
       }).format(date);
 }
 
+function toFormValue(value: unknown, field: TemplateField) {
+  if (value === null || value === undefined) return "";
+  if (field.type === "date" && typeof value === "string") return value.slice(0, 10);
+  return String(value);
+}
+
 export function RequestFormPage() {
   const navigate = useNavigate();
-  const { templateId } = useParams();
+  const { templateId, submissionId } = useParams();
   const { data: template, loading, error, reload } = useTemplate(templateId);
   const [formData, setFormData] = useState<Record<string, string>>({});
-  const [submittedBy, setSubmittedBy] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submission, setSubmission] = useState<Submission | null>(null);
+  const [documents, setDocuments] = useState<SubmissionDocument[]>([]);
+  const [draftReady, setDraftReady] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const uploadQueue = useRef(Promise.resolve());
+  const isDraft = submission?.status.toLowerCase() === "rascunho";
+
+  useEffect(() => {
+    if (!template) return;
+
+    let cancelled = false;
+    setDraftReady(false);
+    setSubmitError(null);
+
+    const loadOrCreateDraft = async () => {
+      try {
+        const draft = submissionId
+          ? await requestService.getSubmission(submissionId)
+          : await requestService.createSubmission({ templateId: template.id, data: {} });
+
+        if (cancelled) return;
+
+        setSubmission(draft);
+        setDocuments(draft.documentos ?? []);
+        setFormData(
+          Object.fromEntries(
+            template.fields.map((field) => [
+              field.campoId,
+              toFormValue(draft.data[field.campoId], field),
+            ]),
+          ),
+        );
+        setDraftReady(true);
+
+        if (!submissionId) {
+          navigate(`/requests/new/${template.id}/${draft.id}`, { replace: true });
+        }
+      } catch (requestError) {
+        if (!cancelled) setSubmitError(getErrorMessage(requestError));
+      }
+    };
+
+    void loadOrCreateDraft();
+    return () => {
+      cancelled = true;
+    };
+  }, [navigate, submissionId, template]);
 
   const updateField = (campoId: string, value: string) => {
     setFormData((current) => ({ ...current, [campoId]: value }));
+  };
+
+  const saveDraft = async () => {
+    if (!template || !submission || submission.status.toLowerCase() !== "rascunho") {
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const result = await requestService.updateSubmission(
+        submission.id,
+        toSubmissionData(template.fields, formData),
+      );
+      setSubmission((current) => (current ? { ...current, ...result } : result));
+    } catch (requestError) {
+      setSubmitError(getErrorMessage(requestError));
+      throw requestError;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!draftReady || !submission || submission.status.toLowerCase() !== "rascunho") {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      void saveDraft().catch(() => undefined);
+    }, 700);
+
+    return () => window.clearTimeout(timeout);
+  }, [draftReady, formData]);
+
+  const handleFiles = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    if (!submission || !files.length) return;
+
+    for (const file of files) {
+      if (file.size > 10 * 1024 * 1024) {
+        setSubmitError(`O arquivo ${file.name} excede o limite de 10 MiB.`);
+        continue;
+      }
+
+      uploadQueue.current = uploadQueue.current.then(async () => {
+        try {
+          const document = await requestService.uploadDocument(submission.id, file);
+          setDocuments((current) => [...current, document]);
+        } catch (requestError) {
+          setSubmitError(getErrorMessage(requestError));
+        }
+      });
+    }
+  };
+
+  const handleDeleteDocument = (documentId: string) => {
+    if (!submission) return;
+
+    void requestService
+      .deleteDocument(submission.id, documentId)
+      .then(() => setDocuments((current) => current.filter((item) => item.id !== documentId)))
+      .catch((requestError) => setSubmitError(getErrorMessage(requestError)));
   };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -76,12 +191,10 @@ export function RequestFormPage() {
     setSubmitError(null);
 
     try {
-      const result = await requestService.createSubmission({
-        templateId: template.id,
-        submittedBy: submittedBy.trim(),
-        data: toSubmissionData(template.fields, formData),
-      });
-      setSubmission(result);
+      await uploadQueue.current;
+      await saveDraft();
+      const result = await requestService.submitSubmission(submission!.id);
+      setSubmission((current) => (current ? { ...current, ...result } : current));
     } catch (requestError) {
       setSubmitError(getErrorMessage(requestError));
     } finally {
@@ -139,21 +252,6 @@ export function RequestFormPage() {
             )}
 
             <form onSubmit={handleSubmit} className="request-form__form">
-              <div className="request-form__field">
-                <label htmlFor="submittedBy" className="request-form__label">
-                  Identificação do usuário
-                  <span className="request-form__required" aria-hidden="true">*</span>
-                </label>
-                <TextField
-                  id="submittedBy"
-                  value={submittedBy}
-                  onChange={(event) => setSubmittedBy(event.target.value)}
-                  placeholder="Nome, matrícula ou e-mail"
-                  required
-                  fullWidth
-                />
-              </div>
-
               {template.fields.map((field) => {
                 const inputId = `field-${field.campoId}`;
                 const value = formData[field.campoId] ?? "";
@@ -180,6 +278,7 @@ export function RequestFormPage() {
                         }
                         placeholder={field.placeholder}
                         required={field.required}
+                        disabled={!isDraft}
                         fullWidth
                       />
                     ) : field.type === "select" ? (
@@ -195,6 +294,7 @@ export function RequestFormPage() {
                           onChange={(event) =>
                             updateField(field.campoId, event.target.value)
                           }
+                          disabled={!isDraft}
                         >
                           {(field.options ?? []).map((option) => (
                             <MenuItem key={option.value} value={option.value}>
@@ -213,6 +313,7 @@ export function RequestFormPage() {
                         }
                         placeholder={field.placeholder}
                         required={field.required}
+                        disabled={!isDraft}
                         fullWidth
                         slotProps={
                           field.type === "number"
@@ -235,7 +336,55 @@ export function RequestFormPage() {
                 );
               })}
 
+              <div className="request-form__documents">
+                <div>
+                  <Typography variant="subtitle1" className="request-form__documents-title">
+                    Documentos anexos
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Formatos aceitos: PDF, DOC, DOCX, JPG, JPEG, PNG e TXT. Limite de 10 MiB por arquivo.
+                  </Typography>
+                </div>
+                {isDraft && (
+                  <Button component="label" variant="outlined" startIcon={<Paperclip size={16} />}>
+                    Anexar documentos
+                    <input
+                      hidden
+                      type="file"
+                      multiple
+                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt"
+                      onChange={handleFiles}
+                    />
+                  </Button>
+                )}
+                {documents.length > 0 && (
+                  <div className="request-form__document-list">
+                    {documents.map((document) => (
+                      <div key={document.id} className="request-form__document">
+                        <span>{document.nomeOriginal}</span>
+                        <Button
+                          type="button"
+                          color="error"
+                          size="small"
+                          onClick={() => handleDeleteDocument(document.id)}
+                          disabled={!isDraft}
+                          aria-label={`Excluir ${document.nomeOriginal}`}
+                        >
+                          <Trash2 size={16} />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {submitError && <Alert severity="error">{submitError}</Alert>}
+
+              {draftReady && (
+                <Typography variant="caption" color="text.secondary">
+                  {saving ? "Salvando rascunho..." : "Rascunho salvo automaticamente."}
+                </Typography>
+              )}
 
               <div className="request-form__actions">
                 <Button
@@ -250,7 +399,7 @@ export function RequestFormPage() {
                   type="submit"
                   variant="contained"
                   startIcon={<Send size={16} />}
-                  disabled={submitting || !template.active}
+                  disabled={submitting || !template.active || !draftReady}
                   fullWidth
                 >
                   {submitting ? "Enviando..." : "Enviar requerimento"}

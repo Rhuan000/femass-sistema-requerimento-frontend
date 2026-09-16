@@ -18,7 +18,8 @@ import { requestService } from "../../lib/api/request-service";
 import type { Submission } from "../../lib/types";
 import "./requests-page-style.scss";
 
-function formatDate(value: string) {
+function formatDate(value: string | null) {
+  if (!value) return "Ainda não enviado";
   const date = new Date(value);
   return Number.isNaN(date.getTime())
     ? value
