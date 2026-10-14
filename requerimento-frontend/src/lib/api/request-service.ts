@@ -76,6 +76,20 @@ function normalizeTemplate(template: Template & { isActive?: boolean }): Templat
   };
 }
 
+function serializeTemplate(input: TemplateInput) {
+  const fieldKeys = new Set<string>();
+  const fields = input.fields.map((field, index) => {
+    const campoId = field.campoId?.trim();
+    if (!campoId) throw new Error(`O campo ${index + 1} precisa de um identificador válido.`);
+    const fieldKey = `campo_${campoId.replace(/-/g, "").toLowerCase()}`;
+    if (!/^[a-z0-9_]+$/.test(fieldKey)) throw new Error(`O identificador do campo ${index + 1} é inválido.`);
+    if (fieldKeys.has(fieldKey)) throw new Error(`O identificador "${fieldKey}" está duplicado.`);
+    fieldKeys.add(fieldKey);
+    return { ...field, campoId, fieldKey };
+  });
+  return { ...input, fields };
+}
+
 function normalizeSubmission(submission: Submission): Submission {
   const compatibleSubmission = submission as Submission & {
     createdAt?: string;
@@ -120,14 +134,14 @@ export const requestService = {
   createTemplate(input: TemplateInput) {
     return apiRequest<Template>("/templates", {
       method: "POST",
-      body: JSON.stringify(input),
+      body: JSON.stringify(serializeTemplate(input)),
     });
   },
 
   updateTemplate(id: string, input: TemplateInput) {
     return apiRequest<Template>(`/templates/${id}`, {
       method: "PUT",
-      body: JSON.stringify(input),
+      body: JSON.stringify(serializeTemplate(input)),
     });
   },
 
