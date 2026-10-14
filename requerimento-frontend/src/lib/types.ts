@@ -23,12 +23,15 @@ export interface TemplateField {
   options?: SelectOption[];
 }
 
+export type TemplateStatus = "PENDENTE" | "EDITANDO" | "APROVADO" | "ATIVO" | "DESATIVADO";
+
 export interface Template {
   id: string;
   name: string;
   description: string;
   category: string;
   active: boolean;
+  status?: TemplateStatus;
   fields: TemplateField[];
   createdAt?: string;
   updatedAt?: string;
