@@ -5,21 +5,32 @@ import {
   FileStack,
   LayoutDashboard,
 } from "lucide-react";
+import { useAuth } from "../../lib/auth/auth-context";
 import "./sidebar-style.scss";
 
 const menuItems = [
   { path: "/", label: "Início", icon: LayoutDashboard },
   { path: "/templates", label: "Catálogo e templates", icon: FileStack },
-  { path: "/templates/new", label: "Criar template", icon: FilePlus2 },
+  {
+    path: "/templates/new",
+    label: "Criar template",
+    icon: FilePlus2,
+    requiresTemplateManager: true,
+  },
   { path: "/requests", label: "Consultar envios", icon: ClipboardList },
 ];
 
 export function Sidebar() {
+  const { permissions } = useAuth();
+  const visibleItems = menuItems.filter(
+    (item) => !item.requiresTemplateManager || permissions.canCreateTemplate,
+  );
+
   return (
     <aside className="app-sidebar">
       <div className="app-sidebar__content">
         <nav className="app-sidebar__nav" aria-label="Navegação principal">
-          {menuItems.map((item) => {
+          {visibleItems.map((item) => {
             const Icon = item.icon;
             return (
               <NavLink

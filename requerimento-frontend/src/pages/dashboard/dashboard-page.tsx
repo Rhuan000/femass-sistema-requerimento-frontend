@@ -3,10 +3,12 @@ import { ClipboardList, FilePlus2, FileStack } from "lucide-react";
 import { Button, Card, CardContent, Typography } from "@mui/material";
 import { AsyncState } from "../../components/async-state/async-state";
 import { useTemplates } from "../../hooks/use-templates";
+import { useAuth } from "../../lib/auth/auth-context";
 import "./dashboard-style.scss";
 
 export function DashboardPage() {
   const navigate = useNavigate();
+  const { permissions } = useAuth();
   const { data: templates, loading, error, reload } = useTemplates();
 
   return (
@@ -48,12 +50,14 @@ export function DashboardPage() {
                 >
                   Abrir catálogo
                 </Button>
-                <Button
-                  startIcon={<FilePlus2 size={18} />}
-                  onClick={() => navigate("/templates/new")}
-                >
-                  Criar template
-                </Button>
+                {permissions.canCreateTemplate && (
+                  <Button
+                    startIcon={<FilePlus2 size={18} />}
+                    onClick={() => navigate("/templates/new")}
+                  >
+                    Criar template
+                  </Button>
+                )}
                 <Button
                   startIcon={<ClipboardList size={18} />}
                   onClick={() => navigate("/requests")}

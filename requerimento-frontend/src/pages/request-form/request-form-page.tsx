@@ -21,7 +21,11 @@ import {
 } from "@mui/material";
 import { AsyncState } from "../../components/async-state/async-state";
 import { useTemplate } from "../../hooks/use-templates";
-import { ApiError, getErrorMessage } from "../../lib/api/http-client";
+import {
+  ApiError,
+  getErrorMessage,
+  getFieldErrors,
+} from "../../lib/api/http-client";
 import { requestService } from "../../lib/api/request-service";
 import type { Submission, SubmissionDocument, TemplateField } from "../../lib/types";
 import "./request-form-style.scss";
@@ -61,10 +65,6 @@ function toFormValue(value: unknown, field: TemplateField) {
   return String(value);
 }
 
-function isEditableStatus(status: string | undefined) {
-  return status?.toLowerCase() === "rascunho";
-}
-
 export function RequestFormPage() {
   const navigate = useNavigate();
   const { templateId, submissionId } = useParams();
@@ -76,9 +76,13 @@ export function RequestFormPage() {
   const [documents, setDocuments] = useState<SubmissionDocument[]>([]);
   const [draftReady, setDraftReady] = useState(false);
   const [saving, setSaving] = useState(false);
+  /** Erros por campo devolvidos pelo backend; a chave é o campoId (fieldKey). */
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const uploadQueue = useRef(Promise.resolve());
-  const isDraft = isEditableStatus(submission?.status);
-  const isSubmitted = Boolean(submission && !isDraft && submission.submittedAt);
+  // Permissões calculadas pelo backend para o usuário atual.
+  const canEdit = Boolean(submission?.canEdit);
+  const canSubmit = Boolean(submission?.canSubmit);
+  const isSubmitted = Boolean(submission && !canEdit && submission.submittedAt);
 
   useEffect(() => {
     if (!template) return;
@@ -138,10 +142,16 @@ export function RequestFormPage() {
 
   const updateField = (campoId: string, value: string) => {
     setFormData((current) => ({ ...current, [campoId]: value }));
+    setFieldErrors((current) => {
+      if (!(campoId in current)) return current;
+      const next = { ...current };
+      delete next[campoId];
+      return next;
+    });
   };
 
   const saveDraft = async () => {
-    if (!template || !submission || !isEditableStatus(submission.status)) {
+    if (!template || !submission?.canEdit) {
       return;
     }
 
@@ -161,7 +171,7 @@ export function RequestFormPage() {
   };
 
   useEffect(() => {
-    if (!draftReady || !submission || !isEditableStatus(submission.status)) {
+    if (!draftReady || !submission?.canEdit) {
       return;
     }
 
@@ -209,14 +219,16 @@ export function RequestFormPage() {
 
     setSubmitting(true);
     setSubmitError(null);
+    setFieldErrors({});
 
     try {
       await uploadQueue.current;
       await saveDraft();
       const result = await requestService.submitSubmission(submission!.id);
-      setSubmission((current) => (current ? { ...current, ...result } : current));
+      setSubmission((current) => (current ? { ...current, ...result } : result));
     } catch (requestError) {
       setSubmitError(getErrorMessage(requestError));
+      setFieldErrors(getFieldErrors(requestError));
     } finally {
       setSubmitting(false);
     }
@@ -265,9 +277,9 @@ export function RequestFormPage() {
           />
 
           <CardContent className="request-form__card-content">
-            {!template.active && (
+            {draftReady && !canSubmit && !isSubmitted && (
               <Alert severity="warning">
-                Este template está inativo e não aceita novos envios.
+                Este requerimento não pode mais ser alterado ou enviado.
               </Alert>
             )}
 
@@ -301,11 +313,16 @@ export function RequestFormPage() {
                         }
                         placeholder={field.placeholder}
                         required={field.required}
-                        disabled={!isDraft}
+                        error={Boolean(fieldErrors[field.campoId])}
+                        disabled={!canEdit}
                         fullWidth
                       />
                     ) : field.type === "select" ? (
-                      <FormControl fullWidth required={field.required}>
+                      <FormControl
+                        fullWidth
+                        required={field.required}
+                        error={Boolean(fieldErrors[field.campoId])}
+                      >
                         <InputLabel id={`${inputId}-label`}>
                           {field.placeholder || "Selecione"}
                         </InputLabel>
@@ -317,7 +334,7 @@ export function RequestFormPage() {
                           onChange={(event) =>
                             updateField(field.campoId, event.target.value)
                           }
-                          disabled={!isDraft}
+                          disabled={!canEdit}
                         >
                           {(field.options ?? []).map((option, optionIndex) => (
                             <MenuItem
@@ -339,7 +356,8 @@ export function RequestFormPage() {
                         }
                         placeholder={field.placeholder}
                         required={field.required}
-                        disabled={!isDraft}
+                        error={Boolean(fieldErrors[field.campoId])}
+                        disabled={!canEdit}
                         fullWidth
                         slotProps={
                           field.type === "number"
@@ -347,6 +365,12 @@ export function RequestFormPage() {
                             : undefined
                         }
                       />
+                    )}
+
+                    {fieldErrors[field.campoId] && (
+                      <Typography variant="caption" color="error" role="alert">
+                        {fieldErrors[field.campoId]}
+                      </Typography>
                     )}
 
                     {field.description && (
@@ -371,7 +395,7 @@ export function RequestFormPage() {
                     Formatos aceitos: PDF, DOC, DOCX, JPG, JPEG, PNG e TXT. Limite de 10 MiB por arquivo.
                   </Typography>
                 </div>
-                {isDraft && (
+                {canEdit && (
                   <Button component="label" variant="outlined" startIcon={<Paperclip size={16} />}>
                     Anexar documentos
                     <input
@@ -393,7 +417,7 @@ export function RequestFormPage() {
                           color="error"
                           size="small"
                           onClick={() => handleDeleteDocument(document.id)}
-                          disabled={!isDraft}
+                          disabled={!canEdit}
                           aria-label={`Excluir ${document.nomeOriginal}`}
                         >
                           <Trash2 size={16} />
@@ -425,7 +449,7 @@ export function RequestFormPage() {
                   type="submit"
                   variant="contained"
                   startIcon={<Send size={16} />}
-                  disabled={submitting || !template.active || !draftReady}
+                  disabled={submitting || !canSubmit || !draftReady}
                   fullWidth
                 >
                   {submitting ? "Enviando..." : "Enviar requerimento"}

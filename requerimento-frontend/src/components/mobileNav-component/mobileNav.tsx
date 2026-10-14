@@ -5,6 +5,7 @@ import {
   FilePlus2,
   ClipboardList,
 } from "lucide-react";
+import { useAuth } from "../../lib/auth/auth-context";
 
 import "./mobileNav.scss";
 
@@ -12,20 +13,31 @@ type MobileNavItem = {
   path: string;
   label: string;
   icon: React.ElementType;
+  requiresTemplateManager?: boolean;
 };
 
 const mobileItems: MobileNavItem[] = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard },
   { path: "/templates", label: "Modelos", icon: FileStack },
-  { path: "/templates/new", label: "Criar", icon: FilePlus2 },
+  {
+    path: "/templates/new",
+    label: "Criar",
+    icon: FilePlus2,
+    requiresTemplateManager: true,
+  },
   { path: "/requests", label: "Requer.", icon: ClipboardList },
 ];
 
 export function MobileNav() {
+  const { permissions } = useAuth();
+  const visibleItems = mobileItems.filter(
+    (item) => !item.requiresTemplateManager || permissions.canCreateTemplate,
+  );
+
   return (
     <nav className="mobile-nav">
       <div className="mobile-nav__container">
-        {mobileItems.map((item) => {
+        {visibleItems.map((item) => {
           const Icon = item.icon;
 
           return (
