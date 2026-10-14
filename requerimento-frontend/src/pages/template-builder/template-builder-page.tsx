@@ -236,7 +236,7 @@ function TemplateBuilderPage() {
             Configure os dados e os campos do formulário dinâmico.
           </Typography>
         </div>
-        <Button variant="contained" onClick={handleSave} disabled={saving}>
+        <Button variant="contained" onClick={handleSave} disabled={saving || Boolean(id && loadedTemplate?.status && loadedTemplate.status !== "EDITANDO")}>
           {saving ? "Salvando..." : "Salvar template"}
         </Button>
       </div>
