@@ -1,10 +1,13 @@
 import type {
+  CurrentUser,
   Submission,
   SubmissionDocument,
   SubmissionInput,
   Template,
+  TemplateAction,
   TemplateInput,
   TemplateField,
+  TemplateStatus,
 } from "../types";
 import { apiDownload, apiRequest } from "./http-client";
 
@@ -27,7 +30,25 @@ function unwrapObject<T>(payload: unknown): T {
   return payload as T;
 }
 
-function normalizeTemplate(template: Template & { isActive?: boolean }): Template {
+type RawTemplate = Omit<Template, "status" | "active" | "availableActions"> & {
+  status?: TemplateStatus;
+  active?: boolean;
+  isActive?: boolean;
+  availableActions?: TemplateAction[];
+};
+
+/** O backend identifica cada campo por "fieldKey"; no front ele é o "campoId". */
+function toTemplatePayload(input: TemplateInput) {
+  return {
+    ...input,
+    fields: input.fields.map(({ campoId, ...field }) => ({
+      ...field,
+      fieldKey: campoId,
+    })),
+  };
+}
+
+function normalizeTemplate(template: RawTemplate): Template {
   const fields = Array.isArray(template.fields)
     ? template.fields.map((field, index) => {
         const rawField = field as TemplateField & {
@@ -67,9 +88,15 @@ function normalizeTemplate(template: Template & { isActive?: boolean }): Templat
       })
     : [];
 
+  const status: TemplateStatus =
+    template.status ??
+    ((template.active ?? template.isActive) ? "ATIVO" : "DESATIVADO");
+
   return {
     ...template,
-    active: template.active ?? template.isActive ?? true,
+    status,
+    active: status === "ATIVO",
+    availableActions: template.availableActions ?? [],
     fields: fields.sort((a, b) => a.position - b.position),
   };
 }
@@ -79,6 +106,9 @@ function normalizeSubmission(submission: Submission): Submission {
     createdAt?: string;
     submissionDate?: string;
   };
+  const rawAnswers = submission.answers as
+    | Array<SubmissionAnswerRaw>
+    | undefined;
 
   return {
     ...submission,
@@ -89,44 +119,73 @@ function normalizeSubmission(submission: Submission): Submission {
       compatibleSubmission.submissionDate ??
       "",
     data: submission.data ?? {},
-    answers:
-      submission.answers ??
-      Object.entries(submission.data ?? {}).map(([campoId, value]) => ({
-        campoId,
-        label: campoId,
-        value,
-      })),
+    answers: rawAnswers
+      ? rawAnswers.map((answer) => ({
+          campoId: answer.campoId ?? answer.fieldKey ?? "",
+          label: answer.label,
+          value: answer.value,
+        }))
+      : Object.entries(submission.data ?? {}).map(([campoId, value]) => ({
+          campoId,
+          label: campoId,
+          value,
+        })),
     documentos: submission.documentos ?? [],
+    canEdit: submission.canEdit ?? false,
+    canSubmit: submission.canSubmit ?? false,
   };
 }
 
+type SubmissionAnswerRaw = {
+  campoId?: string;
+  fieldKey?: string;
+  label: string;
+  value: unknown;
+};
+
+export type TemplateStatusAction = Exclude<TemplateAction, "edit">;
+
 export const requestService = {
+  getCurrentUser() {
+    return apiRequest<CurrentUser>("/me");
+  },
+
   async listTemplates() {
     const payload = await apiRequest<unknown>("/templates");
-    return unwrapList<Template & { isActive?: boolean }>(payload).map(
-      normalizeTemplate,
-    );
+    return unwrapList<RawTemplate>(payload).map(normalizeTemplate);
+  },
+
+  async listManagedTemplates() {
+    const payload = await apiRequest<unknown>("/templates/management");
+    return unwrapList<RawTemplate>(payload).map(normalizeTemplate);
   },
 
   async getTemplate(id: string) {
     const payload = await apiRequest<unknown>(`/templates/${id}`);
-    return normalizeTemplate(
-      unwrapObject<Template & { isActive?: boolean }>(payload),
-    );
+    return normalizeTemplate(unwrapObject<RawTemplate>(payload));
   },
 
-  createTemplate(input: TemplateInput) {
-    return apiRequest<Template>("/templates", {
+  async changeTemplateStatus(id: string, action: TemplateStatusAction) {
+    const payload = await apiRequest<unknown>(`/templates/${id}/${action}`, {
       method: "POST",
-      body: JSON.stringify(input),
     });
+    return normalizeTemplate(unwrapObject<RawTemplate>(payload));
   },
 
-  updateTemplate(id: string, input: TemplateInput) {
-    return apiRequest<Template>(`/templates/${id}`, {
-      method: "PUT",
-      body: JSON.stringify(input),
+  async createTemplate(input: TemplateInput) {
+    const payload = await apiRequest<unknown>("/templates", {
+      method: "POST",
+      body: JSON.stringify(toTemplatePayload(input)),
     });
+    return normalizeTemplate(unwrapObject<RawTemplate>(payload));
+  },
+
+  async updateTemplate(id: string, input: TemplateInput) {
+    const payload = await apiRequest<unknown>(`/templates/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(toTemplatePayload(input)),
+    });
+    return normalizeTemplate(unwrapObject<RawTemplate>(payload));
   },
 
   async createSubmission(input: SubmissionInput) {
@@ -144,11 +203,12 @@ export const requestService = {
     return normalizeSubmission(unwrapObject<Submission>(payload));
   },
 
-  updateSubmission(id: string, data: Record<string, unknown>) {
-    return apiRequest<Submission>(`/submissions/${id}`, {
+  async updateSubmission(id: string, data: Record<string, unknown>) {
+    const payload = await apiRequest<unknown>(`/submissions/${id}`, {
       method: "PUT",
       body: JSON.stringify({ data }),
     });
+    return normalizeSubmission(unwrapObject<Submission>(payload));
   },
 
   uploadDocument(id: string, file: File) {
@@ -173,11 +233,11 @@ export const requestService = {
     );
   },
 
-  submitSubmission(id: string) {
-    return apiRequest<Pick<Submission, "id" | "status" | "submittedAt">>(
-      `/submissions/${id}/submit`,
-      { method: "POST" },
-    );
+  async submitSubmission(id: string) {
+    const payload = await apiRequest<unknown>(`/submissions/${id}/submit`, {
+      method: "POST",
+    });
+    return normalizeSubmission(unwrapObject<Submission>(payload));
   },
 
   async listSubmissionsByTemplate(templateId: string) {

@@ -10,12 +10,35 @@ if (!API_URL) {
 
 export class ApiError extends Error {
   status: number;
+  /** Mensagens por campo devolvidas pelo backend em erros 400. */
+  fieldErrors: Record<string, string>;
 
-  constructor(message: string, status: number) {
+  constructor(
+    message: string,
+    status: number,
+    fieldErrors: Record<string, string> = {},
+  ) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.fieldErrors = fieldErrors;
   }
+}
+
+function extractFieldErrors(payload: unknown): Record<string, string> {
+  if (!payload || typeof payload !== "object") return {};
+  const fieldErrors = (payload as Record<string, unknown>).fieldErrors;
+  if (!fieldErrors || typeof fieldErrors !== "object") return {};
+
+  return Object.fromEntries(
+    Object.entries(fieldErrors).filter(
+      (entry): entry is [string, string] => typeof entry[1] === "string",
+    ),
+  );
+}
+
+export function getFieldErrors(error: unknown) {
+  return error instanceof ApiError ? error.fieldErrors : {};
 }
 
 function extractErrorMessage(payload: unknown, fallback: string) {
@@ -100,6 +123,7 @@ export async function apiRequest<T>(
             `A API retornou o status ${response.status}. Tente novamente.`,
         ),
         response.status,
+        extractFieldErrors(payload),
     );
   }
 
@@ -131,6 +155,7 @@ export async function apiDownload(path: string): Promise<Blob> {
         `A API retornou o status ${response.status}. Tente novamente.`,
       ),
       response.status,
+      extractFieldErrors(payload),
     );
   }
 

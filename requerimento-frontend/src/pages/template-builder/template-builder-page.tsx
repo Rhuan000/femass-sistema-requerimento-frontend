@@ -18,12 +18,15 @@ import {
 } from "@mui/material";
 import { ChevronDown, FileText, Plus, Trash2 } from "lucide-react";
 import { AsyncState } from "../../components/async-state/async-state";
+import { TemplateStatusChip } from "../../components/template-status-chip/template-status-chip";
 import { useAsync } from "../../hooks/use-async";
-import { getErrorMessage } from "../../lib/api/http-client";
+import { getErrorMessage, getFieldErrors } from "../../lib/api/http-client";
 import { requestService } from "../../lib/api/request-service";
+import { useAuth } from "../../lib/auth/auth-context";
 import {
   FIELD_TYPES,
   TEMPLATE_CATEGORIES,
+  TEMPLATE_STATUS_INFO,
   type FieldType,
   type SelectOption,
   type TemplateField,
@@ -35,9 +38,10 @@ interface EditableField extends TemplateField {
   clientId: string;
 }
 
+// Identificador técnico do campo ("fieldKey" no backend): letras minúsculas,
+// números e "_". Gerado automaticamente; o formato é validado pelo backend.
 const createCampoId = () =>
-  globalThis.crypto?.randomUUID?.() ??
-  `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  `campo_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
 const createClientId = () =>
   globalThis.crypto?.randomUUID?.() ??
@@ -58,6 +62,7 @@ const createField = (position: number): EditableField => ({
 function TemplateBuilderPage() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { permissions } = useAuth();
   const {
     data: loadedTemplate,
     loading,
@@ -72,7 +77,6 @@ function TemplateBuilderPage() {
     name: "",
     description: "",
     category: TEMPLATE_CATEGORIES[0],
-    active: true,
     fields: [],
   });
   const [fields, setFields] = useState<EditableField[]>([]);
@@ -81,6 +85,10 @@ function TemplateBuilderPage() {
   );
   const [expandedId, setExpandedId] = useState<string | false>(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  /** Erros devolvidos pelo backend, por clientId do campo e propriedade. */
+  const [fieldErrors, setFieldErrors] = useState<
+    Record<string, Record<string, string>>
+  >({});
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -91,7 +99,6 @@ function TemplateBuilderPage() {
         name: loadedTemplate.name,
         description: loadedTemplate.description,
         category: loadedTemplate.category,
-        active: loadedTemplate.active,
         fields: [],
       });
       const editableFields = loadedTemplate.fields.map((field) => ({
@@ -147,14 +154,14 @@ function TemplateBuilderPage() {
     );
   };
 
+  // Regras dos campos (lista vazia, rótulo, identificador) são validadas pelo
+  // backend e voltam em fieldErrors. Aqui ficam só as checagens que o backend
+  // ainda não faz.
   const validate = () => {
     if (!template.name.trim()) return "Informe o nome do template.";
     if (!template.category.trim()) return "Informe a categoria.";
-    if (fields.length === 0) return "Adicione pelo menos um campo.";
 
     for (const field of fields) {
-      if (!field.campoId) return "Todos os campos precisam de um identificador.";
-      if (!field.label.trim()) return "Todos os campos precisam de um rótulo.";
       if (
         field.type === "select" &&
         (!field.options?.length ||
@@ -162,13 +169,8 @@ function TemplateBuilderPage() {
             (option) => !option.label.trim() || !option.value.trim(),
           ))
       ) {
-        return `Preencha o label e o value de todas as opções de "${field.label}".`;
+        return `Preencha o label e o value de todas as opções de "${field.label || "campo sem rótulo"}".`;
       }
-    }
-
-    const campoIds = fields.map((field) => field.campoId);
-    if (new Set(campoIds).size !== campoIds.length) {
-      return "Os identificadores dos campos não podem se repetir.";
     }
 
     const positions = fields.map((field) => field.position);
@@ -178,7 +180,12 @@ function TemplateBuilderPage() {
     return null;
   };
 
+  const readOnly = Boolean(
+    id && loadedTemplate && !loadedTemplate.availableActions.includes("edit"),
+  );
+
   const handleSave = async () => {
+    if (readOnly) return;
     const validationError = validate();
     if (validationError) {
       setSaveError(validationError);
@@ -187,14 +194,15 @@ function TemplateBuilderPage() {
 
     setSaving(true);
     setSaveError(null);
+    setFieldErrors({});
 
+    const sortedFields = [...fields].sort((a, b) => a.position - b.position);
     const payload: TemplateInput = {
       ...template,
       name: template.name.trim(),
       description: template.description.trim(),
       category: template.category.trim(),
-      fields: fields
-        .map((field) => ({
+      fields: sortedFields.map((field) => ({
           id: field.id,
           campoId: field.campoId,
           label: field.label,
@@ -204,8 +212,7 @@ function TemplateBuilderPage() {
           description: field.description,
           position: field.position,
           options: field.type === "select" ? field.options : undefined,
-        }))
-        .sort((a, b) => a.position - b.position),
+        })),
     };
 
     try {
@@ -214,10 +221,38 @@ function TemplateBuilderPage() {
       navigate("/templates");
     } catch (requestError) {
       setSaveError(getErrorMessage(requestError));
+
+      // As chaves seguem o JSON enviado: "fields" ou "fields[i].label".
+      const byField: Record<string, Record<string, string>> = {};
+      for (const [key, message] of Object.entries(getFieldErrors(requestError))) {
+        const match = /^fields\[(\d+)\]\.(\w+)$/.exec(key);
+        const field = match ? sortedFields[Number(match[1])] : undefined;
+        if (!field || !match) continue;
+        byField[field.clientId] = { ...byField[field.clientId], [match[2]]: message };
+      }
+      setFieldErrors(byField);
+      const firstWithError = sortedFields.find((field) => byField[field.clientId]);
+      if (firstWithError) setExpandedId(firstWithError.clientId);
     } finally {
       setSaving(false);
     }
   };
+
+  if (!id && !permissions.canCreateTemplate) {
+    return (
+      <div className="template-builder">
+        <Alert severity="warning">
+          Somente diretor, coordenador ou secretaria podem criar templates e
+          solicitar aprovação.
+        </Alert>
+        <div>
+          <Button variant="outlined" onClick={() => navigate("/templates")}>
+            Voltar para o catálogo
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   if (id && (loading || loadError)) {
     return (
@@ -236,11 +271,29 @@ function TemplateBuilderPage() {
             Configure os dados e os campos do formulário dinâmico.
           </Typography>
         </div>
-        <Button variant="contained" onClick={handleSave} disabled={saving}>
-          {saving ? "Salvando..." : "Salvar template"}
+        <Button variant="contained" onClick={handleSave} disabled={saving || readOnly}>
+          {saving ? "Salvando..." : id ? "Salvar alterações" : "Enviar para aprovação"}
         </Button>
       </div>
 
+      {!id && (
+        <Alert severity="info">
+          Ao salvar, o template fica aguardando a aprovação do diretor antes de
+          ser disponibilizado.
+        </Alert>
+      )}
+      {readOnly && loadedTemplate && (
+        <Alert severity="warning">
+          Você não pode alterar este template enquanto ele estiver como "
+          {TEMPLATE_STATUS_INFO[loadedTemplate.status].label}".
+        </Alert>
+      )}
+      {id && !readOnly && (
+        <Alert severity="info">
+          Depois de salvar, use "Enviar para aprovação" na tela de templates para
+          que o diretor avalie as alterações.
+        </Alert>
+      )}
       {saveError && <Alert severity="error">{saveError}</Alert>}
 
       <div className="template-builder__layout">
@@ -293,20 +346,6 @@ function TemplateBuilderPage() {
                   multiline
                   minRows={3}
                   fullWidth
-                />
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={template.active}
-                      onChange={(event) =>
-                        setTemplate((current) => ({
-                          ...current,
-                          active: event.target.checked,
-                        }))
-                      }
-                    />
-                  }
-                  label="Template ativo"
                 />
               </div>
             </CardContent>
@@ -386,6 +425,17 @@ function TemplateBuilderPage() {
                         </AccordionSummary>
 
                         <AccordionDetails className="template-builder__accordion-details">
+                          {(fieldErrors[field.clientId]?.fieldKey ||
+                            fieldErrors[field.clientId]?.type) && (
+                            <Alert severity="error">
+                              {[
+                                fieldErrors[field.clientId]?.fieldKey,
+                                fieldErrors[field.clientId]?.type,
+                              ]
+                                .filter(Boolean)
+                                .join(" ")}
+                            </Alert>
+                          )}
                           <div className="template-builder__field-grid">
                             <TextField
                               label="Rótulo"
@@ -396,6 +446,8 @@ function TemplateBuilderPage() {
                                   label,
                                 });
                               }}
+                              error={Boolean(fieldErrors[field.clientId]?.label)}
+                              helperText={fieldErrors[field.clientId]?.label}
                               required
                               fullWidth
                             />
@@ -547,9 +599,11 @@ function TemplateBuilderPage() {
                 {template.name || "Template sem nome"}
               </Typography>
               <Typography variant="body2" className="template-builder__subtitle">
-                {fields.length} {fields.length === 1 ? "campo" : "campos"} •{" "}
-                {template.active ? "Ativo" : "Inativo"}
+                {fields.length} {fields.length === 1 ? "campo" : "campos"}
               </Typography>
+              <div>
+                <TemplateStatusChip status={loadedTemplate?.status ?? "PENDENTE"} />
+              </div>
               {[...fields]
                 .sort((a, b) => a.position - b.position)
                 .map((field) => (
