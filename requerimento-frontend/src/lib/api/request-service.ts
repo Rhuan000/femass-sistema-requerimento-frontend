@@ -5,6 +5,7 @@ import type {
   Template,
   TemplateInput,
   TemplateField,
+  TemplateStatus,
 } from "../types";
 import { apiDownload, apiRequest } from "./http-client";
 
@@ -69,9 +70,24 @@ function normalizeTemplate(template: Template & { isActive?: boolean }): Templat
 
   return {
     ...template,
-    active: template.active ?? template.isActive ?? true,
+    active: template.status ? template.status === "ATIVO" : (template.active ?? template.isActive ?? false),
+    status: template.status as TemplateStatus | undefined,
     fields: fields.sort((a, b) => a.position - b.position),
   };
+}
+
+function serializeTemplate(input: TemplateInput) {
+  const fieldKeys = new Set<string>();
+  const fields = input.fields.map((field, index) => {
+    const campoId = field.campoId?.trim();
+    if (!campoId) throw new Error(`O campo ${index + 1} precisa de um identificador válido.`);
+    const fieldKey = `campo_${campoId.replace(/-/g, "").toLowerCase()}`;
+    if (!/^[a-z0-9_]+$/.test(fieldKey)) throw new Error(`O identificador do campo ${index + 1} é inválido.`);
+    if (fieldKeys.has(fieldKey)) throw new Error(`O identificador "${fieldKey}" está duplicado.`);
+    fieldKeys.add(fieldKey);
+    return { ...field, campoId, fieldKey };
+  });
+  return { ...input, fields };
 }
 
 function normalizeSubmission(submission: Submission): Submission {
@@ -101,8 +117,8 @@ function normalizeSubmission(submission: Submission): Submission {
 }
 
 export const requestService = {
-  async listTemplates() {
-    const payload = await apiRequest<unknown>("/templates");
+  async listTemplates(management = false) {
+    const payload = await apiRequest<unknown>(management ? "/templates/management" : "/templates");
     return unwrapList<Template & { isActive?: boolean }>(payload).map(
       normalizeTemplate,
     );
@@ -118,15 +134,20 @@ export const requestService = {
   createTemplate(input: TemplateInput) {
     return apiRequest<Template>("/templates", {
       method: "POST",
-      body: JSON.stringify(input),
+      body: JSON.stringify(serializeTemplate(input)),
     });
   },
 
   updateTemplate(id: string, input: TemplateInput) {
     return apiRequest<Template>(`/templates/${id}`, {
       method: "PUT",
-      body: JSON.stringify(input),
+      body: JSON.stringify(serializeTemplate(input)),
     });
+  },
+
+  async transitionTemplate(id: string, action: "submit-approval" | "approve" | "return-for-editing" | "activate" | "deactivate") {
+    const payload = await apiRequest<unknown>(`/templates/${id}/${action}`, { method: "POST" });
+    return normalizeTemplate(unwrapObject<Template & { isActive?: boolean }>(payload));
   },
 
   async createSubmission(input: SubmissionInput) {
