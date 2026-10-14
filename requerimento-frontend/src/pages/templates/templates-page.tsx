@@ -161,16 +161,14 @@ export function TemplatesPage() {
                     {template.fields.length === 1 ? "campo" : "campos"}
                   </Typography>
                   <div className="templates-list__card-actions">
-                    {view === "admin" && (
-                      <Button
-                        variant="text"
-                        size="small"
-                        startIcon={<Edit2 size={15} />}
-                        onClick={() => navigate(`/templates/edit/${template.id}`)}
-                      >
-                        Editar
-                      </Button>
-                    )}
+                    <Button
+                      variant="text"
+                      size="small"
+                      startIcon={<Edit2 size={15} />}
+                      onClick={() => navigate(`/templates/edit/${template.id}`)}
+                    >
+                      Editar modelo
+                    </Button>
                     <Button
                       variant="contained"
                       size="small"

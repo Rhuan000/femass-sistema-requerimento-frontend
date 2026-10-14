@@ -21,7 +21,7 @@ import {
 } from "@mui/material";
 import { AsyncState } from "../../components/async-state/async-state";
 import { useTemplate } from "../../hooks/use-templates";
-import { getErrorMessage } from "../../lib/api/http-client";
+import { ApiError, getErrorMessage } from "../../lib/api/http-client";
 import { requestService } from "../../lib/api/request-service";
 import type { Submission, SubmissionDocument, TemplateField } from "../../lib/types";
 import "./request-form-style.scss";
@@ -61,6 +61,10 @@ function toFormValue(value: unknown, field: TemplateField) {
   return String(value);
 }
 
+function isEditableStatus(status: string | undefined) {
+  return status?.toLowerCase() === "rascunho";
+}
+
 export function RequestFormPage() {
   const navigate = useNavigate();
   const { templateId, submissionId } = useParams();
@@ -73,7 +77,8 @@ export function RequestFormPage() {
   const [draftReady, setDraftReady] = useState(false);
   const [saving, setSaving] = useState(false);
   const uploadQueue = useRef(Promise.resolve());
-  const isDraft = submission?.status.toLowerCase() === "rascunho";
+  const isDraft = isEditableStatus(submission?.status);
+  const isSubmitted = Boolean(submission && !isDraft && submission.submittedAt);
 
   useEffect(() => {
     if (!template) return;
@@ -84,9 +89,24 @@ export function RequestFormPage() {
 
     const loadOrCreateDraft = async () => {
       try {
-        const draft = submissionId
-          ? await requestService.getSubmission(submissionId)
-          : await requestService.createSubmission({ templateId: template.id, data: {} });
+        let draft: Submission;
+
+        if (submissionId) {
+          draft = await requestService.getSubmission(submissionId);
+        } else {
+          try {
+            draft = await requestService.getDraftByTemplate(template.id);
+          } catch (requestError) {
+            if (!(requestError instanceof ApiError) || requestError.status !== 404) {
+              throw requestError;
+            }
+
+            draft = await requestService.createSubmission({
+              templateId: template.id,
+              data: {},
+            });
+          }
+        }
 
         if (cancelled) return;
 
@@ -121,7 +141,7 @@ export function RequestFormPage() {
   };
 
   const saveDraft = async () => {
-    if (!template || !submission || submission.status.toLowerCase() !== "rascunho") {
+    if (!template || !submission || !isEditableStatus(submission.status)) {
       return;
     }
 
@@ -141,7 +161,7 @@ export function RequestFormPage() {
   };
 
   useEffect(() => {
-    if (!draftReady || !submission || submission.status.toLowerCase() !== "rascunho") {
+    if (!draftReady || !submission || !isEditableStatus(submission.status)) {
       return;
     }
 
@@ -257,7 +277,10 @@ export function RequestFormPage() {
                 const value = formData[field.campoId] ?? "";
 
                 return (
-                  <div key={field.campoId} className="request-form__field">
+                  <div
+                    key={field.campoId || field.id || inputId}
+                    className="request-form__field"
+                  >
                     <label htmlFor={inputId} className="request-form__label">
                       {field.label}
                       {field.required && (
@@ -296,8 +319,11 @@ export function RequestFormPage() {
                           }
                           disabled={!isDraft}
                         >
-                          {(field.options ?? []).map((option) => (
-                            <MenuItem key={option.value} value={option.value}>
+                          {(field.options ?? []).map((option, optionIndex) => (
+                            <MenuItem
+                              key={`${inputId}-${option.value || option.label || optionIndex}`}
+                              value={option.value}
+                            >
                               {option.label}
                             </MenuItem>
                           ))}
@@ -410,7 +436,7 @@ export function RequestFormPage() {
         </Card>
       )}
 
-      <Dialog open={Boolean(submission)} maxWidth="sm" fullWidth>
+      <Dialog open={isSubmitted} maxWidth="sm" fullWidth>
         <DialogTitle>Requerimento enviado</DialogTitle>
         <DialogContent>
           <Alert severity="success" className="request-form__success-alert">

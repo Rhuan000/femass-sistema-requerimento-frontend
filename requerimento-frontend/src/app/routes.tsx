@@ -4,6 +4,7 @@ import { DashboardPage } from "../pages/dashboard/dashboard-page";
 import { TemplatesPage } from "../pages/templates/templates-page";
 import TemplateBuilderPage from "../pages/template-builder/template-builder-page";
 import { RequestsPage } from "../pages/requests/requests-page";
+import { SubmissionDetailsPage } from "../pages/requests/submission-details-page";
 import { RequestFormPage } from "../pages/request-form/request-form-page";
 import { AppLayout } from "./app-layout";
 
@@ -17,6 +18,10 @@ export function AppRoutes() {
           <Route path="/templates/new" element={<TemplateBuilderPage />} />
           <Route path="/templates/edit/:id" element={<TemplateBuilderPage />} />
           <Route path="/requests" element={<RequestsPage />} />
+          <Route
+            path="/requests/:templateId/:submissionId"
+            element={<SubmissionDetailsPage />}
+          />
           <Route path="/requests/new/:templateId" element={<RequestFormPage />} />
           <Route
             path="/requests/new/:templateId/:submissionId"

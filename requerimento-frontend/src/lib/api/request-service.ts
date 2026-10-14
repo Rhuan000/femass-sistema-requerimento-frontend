@@ -4,8 +4,9 @@ import type {
   SubmissionInput,
   Template,
   TemplateInput,
+  TemplateField,
 } from "../types";
-import { apiRequest } from "./http-client";
+import { apiDownload, apiRequest } from "./http-client";
 
 function unwrapList<T>(payload: unknown): T[] {
   if (Array.isArray(payload)) return payload as T[];
@@ -19,6 +20,7 @@ function unwrapList<T>(payload: unknown): T[] {
 function unwrapObject<T>(payload: unknown): T {
   if (payload && typeof payload === "object") {
     const data = payload as Record<string, unknown>;
+    if (typeof data.id === "string") return payload as T;
     const nested = data.data ?? data.item ?? data.result;
     if (nested && typeof nested === "object") return nested as T;
   }
@@ -26,12 +28,49 @@ function unwrapObject<T>(payload: unknown): T {
 }
 
 function normalizeTemplate(template: Template & { isActive?: boolean }): Template {
+  const fields = Array.isArray(template.fields)
+    ? template.fields.map((field, index) => {
+        const rawField = field as TemplateField & {
+          campo_id?: string;
+          campoID?: string;
+          fieldId?: string;
+          fieldKey?: string;
+          key?: string;
+          code?: string;
+          identifier?: string;
+          campo?: {
+            id?: string;
+            campoId?: string;
+            key?: string;
+            code?: string;
+          };
+        };
+
+        return {
+          ...field,
+          campoId:
+            field.campoId ||
+            rawField.campo_id ||
+            rawField.campoID ||
+            rawField.fieldId ||
+            rawField.fieldKey ||
+            rawField.key ||
+            rawField.code ||
+            rawField.identifier ||
+            rawField.campo?.campoId ||
+            rawField.campo?.key ||
+            rawField.campo?.code ||
+            rawField.campo?.id ||
+            field.id ||
+            `campo-${index + 1}`,
+        };
+      })
+    : [];
+
   return {
     ...template,
     active: template.active ?? template.isActive ?? true,
-    fields: Array.isArray(template.fields)
-      ? [...template.fields].sort((a, b) => a.position - b.position)
-      : [],
+    fields: fields.sort((a, b) => a.position - b.position),
   };
 }
 
@@ -43,6 +82,7 @@ function normalizeSubmission(submission: Submission): Submission {
 
   return {
     ...submission,
+    status: submission.status ?? "RASCUNHO",
     submittedAt:
       submission.submittedAt ??
       compatibleSubmission.createdAt ??
@@ -89,11 +129,19 @@ export const requestService = {
     });
   },
 
-  createSubmission(input: SubmissionInput) {
-    return apiRequest<Submission>("/submissions", {
+  async createSubmission(input: SubmissionInput) {
+    const payload = await apiRequest<unknown>("/submissions", {
       method: "POST",
       body: JSON.stringify(input),
     });
+    return normalizeSubmission(unwrapObject<Submission>(payload));
+  },
+
+  async getDraftByTemplate(templateId: string) {
+    const payload = await apiRequest<unknown>(
+      `/submissions/draft/template/${templateId}`,
+    );
+    return normalizeSubmission(unwrapObject<Submission>(payload));
   },
 
   updateSubmission(id: string, data: Record<string, unknown>) {
@@ -116,6 +164,12 @@ export const requestService = {
     return apiRequest<void>(
       `/submissions/${submissionId}/documents/${documentId}`,
       { method: "DELETE" },
+    );
+  },
+
+  downloadDocument(submissionId: string, documentId: string) {
+    return apiDownload(
+      `/submissions/${submissionId}/documents/${documentId}/download`,
     );
   },
 
