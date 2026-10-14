@@ -69,7 +69,7 @@ export async function apiRequest<T>(
   const isMultipart = options.body instanceof FormData;
 
   try {
-    await keycloak.updateToken(30);
+    if (keycloak?.authenticated) await keycloak.updateToken(30);
 
     response = await fetch(`${API_URL.replace(/\/$/, "")}${path}`, {
       ...options,
@@ -78,8 +78,8 @@ export async function apiRequest<T>(
         ...(options.body && !isMultipart
             ? { "Content-Type": "application/json" }
             : {}),
-        ...(keycloak.token
-            ? { Authorization: `Bearer ${keycloak.token}` }
+        ...(keycloak?.token
+            ? { Authorization: `Bearer ${keycloak?.token}` }
             : {}),
         ...options.headers,
       },
