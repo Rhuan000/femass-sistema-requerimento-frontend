@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Edit2, FilePlus2, Search } from "lucide-react";
 import {
@@ -12,25 +12,45 @@ import {
 } from "@mui/material";
 import { AsyncState } from "../../components/async-state/async-state";
 import { useTemplates } from "../../hooks/use-templates";
+import { requestService } from "../../lib/api/request-service";
+import { getErrorMessage } from "../../lib/api/http-client";
+import { TemplateApprovalFlow } from "../../components/template-approval-flow/template-approval-flow";
+import type { Template } from "../../lib/types";
 import "./templates-styles.scss";
 
 export function TemplatesPage() {
   const navigate = useNavigate();
   const { data: templates, loading, error, reload } = useTemplates();
+  const [managedTemplates, setManagedTemplates] = useState<Template[]>([]);
+  const [managementLoading, setManagementLoading] = useState(false);
+  const [managementError, setManagementError] = useState<string | null>(null);
+  const [revision, setRevision] = useState(0);
   const [view, setView] = useState<"catalog" | "admin">("catalog");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (view !== "admin") return;
+    let active = true;
+    requestService.listTemplates(true).then((items) => {
+      if (active) { setManagedTemplates(items); setManagementError(null); }
+    }).catch((err: unknown) => {
+      if (active) setManagementError(getErrorMessage(err));
+    }).finally(() => { if (active) setManagementLoading(false); });
+    return () => { active = false; };
+  }, [view, revision]);
+
+  const visibleTemplates = view === "admin" ? managedTemplates : (templates ?? []);
   const categories = useMemo(
     () =>
-      [...new Set((templates ?? []).map((template) => template.category))].sort(),
-    [templates],
+      [...new Set(visibleTemplates.map((template) => template.category))].sort(),
+    [visibleTemplates],
   );
 
   const filteredTemplates = useMemo(() => {
     const query = searchQuery.toLocaleLowerCase("pt-BR").trim();
 
-    return (templates ?? []).filter((template) => {
+    return visibleTemplates.filter((template) => {
       if (view === "catalog" && !template.active) return false;
       const matchesSearch =
         template.name.toLocaleLowerCase("pt-BR").includes(query) ||
@@ -39,7 +59,7 @@ export function TemplatesPage() {
         !selectedCategory || template.category === selectedCategory;
       return matchesSearch && matchesCategory;
     });
-  }, [searchQuery, selectedCategory, templates, view]);
+  }, [searchQuery, selectedCategory, visibleTemplates, view]);
 
   return (
     <div className="templates-list">
@@ -121,6 +141,8 @@ export function TemplatesPage() {
         </div>
       )}
 
+      {view === "admin" && managementError && <Typography color="error">{managementError}</Typography>}
+      {view === "admin" && managementLoading && <Typography>Carregando administração...</Typography>}
       <AsyncState
         loading={loading}
         error={error}
@@ -141,6 +163,7 @@ export function TemplatesPage() {
                       {template.name}
                     </Typography>
                     <div className="templates-list__badges">
+                      {template.status && <Chip label={template.status} size="small" color={template.status === "ATIVO" ? "success" : "default"} />}
                       <Chip label={template.category} size="small" variant="outlined" />
                       <Chip
                         label={template.active ? "Ativo" : "Inativo"}
@@ -155,6 +178,9 @@ export function TemplatesPage() {
                   {template.description}
                 </Typography>
 
+                {view === "admin" && template.status && (
+                  <TemplateApprovalFlow template={template} onChanged={() => setRevision((v) => v + 1)} />
+                )}
                 <div className="templates-list__card-footer">
                   <Typography variant="body2" className="templates-list__fields-count">
                     {template.fields.length}{" "}
@@ -165,6 +191,7 @@ export function TemplatesPage() {
                       variant="text"
                       size="small"
                       startIcon={<Edit2 size={15} />}
+                      disabled={template.status !== undefined && template.status !== "EDITANDO"}
                       onClick={() => navigate(`/templates/edit/${template.id}`)}
                     >
                       Editar modelo
