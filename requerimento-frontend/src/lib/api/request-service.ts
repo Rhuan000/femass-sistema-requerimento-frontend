@@ -5,6 +5,7 @@ import type {
   Template,
   TemplateInput,
   TemplateField,
+  TemplateStatus,
 } from "../types";
 import { apiDownload, apiRequest } from "./http-client";
 
@@ -69,7 +70,8 @@ function normalizeTemplate(template: Template & { isActive?: boolean }): Templat
 
   return {
     ...template,
-    active: template.active ?? template.isActive ?? true,
+    active: template.status ? template.status === "ATIVO" : (template.active ?? template.isActive ?? false),
+    status: template.status as TemplateStatus | undefined,
     fields: fields.sort((a, b) => a.position - b.position),
   };
 }
@@ -101,8 +103,8 @@ function normalizeSubmission(submission: Submission): Submission {
 }
 
 export const requestService = {
-  async listTemplates() {
-    const payload = await apiRequest<unknown>("/templates");
+  async listTemplates(management = false) {
+    const payload = await apiRequest<unknown>(management ? "/templates/management" : "/templates");
     return unwrapList<Template & { isActive?: boolean }>(payload).map(
       normalizeTemplate,
     );
@@ -127,6 +129,11 @@ export const requestService = {
       method: "PUT",
       body: JSON.stringify(input),
     });
+  },
+
+  async transitionTemplate(id: string, action: "submit-approval" | "approve" | "return-for-editing" | "activate" | "deactivate") {
+    const payload = await apiRequest<unknown>(`/templates/${id}/${action}`, { method: "POST" });
+    return normalizeTemplate(unwrapObject<Template & { isActive?: boolean }>(payload));
   },
 
   async createSubmission(input: SubmissionInput) {
