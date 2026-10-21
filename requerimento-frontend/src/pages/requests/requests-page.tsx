@@ -34,6 +34,7 @@ function statusColor(
   status: string,
 ): "default" | "primary" | "success" | "warning" | "error" {
   const normalized = status.toLowerCase();
+  if (normalized === "em_aprovacao") return "primary";
   if (normalized.includes("aprov") || normalized.includes("concl")) return "success";
   if (normalized.includes("reje") || normalized.includes("cancel")) return "error";
   if (normalized.includes("analis") || normalized.includes("progress")) return "primary";
@@ -42,7 +43,7 @@ function statusColor(
 }
 
 function Answers({ submission }: { submission: Submission }) {
-  if (!submission.answers.length) return <span>Nenhuma resposta</span>;
+  if (!submission.answers.length) return <span className="requests-list__no-answers">Nenhuma resposta preenchida.</span>;
 
   return (
     <dl className="requests-list__answers">
@@ -169,37 +170,38 @@ export function RequestsPage() {
               <CardContent>
                 <div className="requests-list__submission-header">
                   <div>
-                    <Typography variant="overline">ID do envio</Typography>
-                    <Typography className="requests-list__cell-id">
-                      {submission.id}
+                    <Typography variant="h6" component="h2" className="requests-list__submission-title">
+                      {submission.templateName || "Requerimento"}
                     </Typography>
+                    <p className="requests-list__protocol">Protocolo <span>{submission.id}</span></p>
                   </div>
                   <Chip
-                    label={submission.status}
+                    label={submission.status.replaceAll("_", " ")}
                     color={statusColor(submission.status)}
                     size="small"
+                    variant="outlined"
+                    className="requests-list__submission-status"
                   />
                 </div>
                 <div className="requests-list__metadata">
                   <div>
-                    <span>Template</span>
-                    <strong>{submission.templateName || submission.templateId}</strong>
-                  </div>
-                  <div>
-                    <span>Usuário</span>
+                    <span>Solicitante</span>
                     <strong>{submission.submittedBy || "Usuário autenticado"}</strong>
                   </div>
                   <div>
-                    <span>Data</span>
+                    <span>Enviado em</span>
                     <strong>{formatDate(submission.submittedAt)}</strong>
                   </div>
                 </div>
                 <div className="requests-list__answers-block">
-                  <Typography variant="subtitle2">Respostas</Typography>
+                  <Typography component="h3" variant="subtitle2" className="requests-list__section-title">Respostas do requerimento</Typography>
                   <Answers submission={submission} />
                 </div>
+                <div className="requests-list__submission-footer">
                 <Button
-                  variant="outlined"
+                  variant="contained"
+                  disableElevation
+                  size="small"
                   startIcon={<Eye size={16} />}
                   onClick={() =>
                     navigate(`/requests/${submission.templateId}/${submission.id}`)
@@ -207,6 +209,7 @@ export function RequestsPage() {
                 >
                   Ver requerimento completo
                 </Button>
+                </div>
               </CardContent>
             </Card>
           ))}

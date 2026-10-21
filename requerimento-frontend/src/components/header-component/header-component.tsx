@@ -9,6 +9,7 @@ import {
   MenuItem,
 } from "@mui/material";
 import { useAuth } from "../../lib/auth/auth-context";
+import { ApprovalNotifications } from "../approval-flow/approval-notifications";
 import "./header-style.scss";
 
 export function Header() {
@@ -34,6 +35,7 @@ export function Header() {
         </div>
 
         <div className="app-header__actions">
+          <ApprovalNotifications />
           <IconButton
             aria-label="Abrir menu do usuário"
             onClick={(event) => setAnchorEl(event.currentTarget)}

@@ -1,4 +1,5 @@
 import type {
+  ApprovalPerson, ApprovalFlow, ApprovalNotification,
   CurrentUser,
   Submission,
   SubmissionDocument,
@@ -146,6 +147,19 @@ type SubmissionAnswerRaw = {
 export type TemplateStatusAction = Exclude<TemplateAction, "edit">;
 
 export const requestService = {
+  approvalPeople() { return apiRequest<ApprovalPerson[]>("/approvals/people"); },
+  approvalFlow(id: string) { return apiRequest<ApprovalFlow>(`/approvals/submissions/${id}`); },
+  decideApproval(id: string, stepId: string, input: {
+    action: "APPROVE" | "REJECT" | "REASSIGN"; reason: string; version: number; targetUserId?: string;
+  }) {
+    return apiRequest<ApprovalFlow>(`/approvals/submissions/${id}/steps/${stepId}/decisions`, {
+      method: "POST", body: JSON.stringify(input),
+    });
+  },
+  approvalNotifications() { return apiRequest<ApprovalNotification[]>("/approvals/notifications"); },
+  readApprovalNotification(id: string) {
+    return apiRequest<void>(`/approvals/notifications/${id}/read`, { method: "POST" });
+  },
   getCurrentUser() {
     return apiRequest<CurrentUser>("/me");
   },

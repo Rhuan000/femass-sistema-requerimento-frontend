@@ -12,6 +12,7 @@ import {
 } from "@mui/material";
 import { useNavigate, useParams } from "react-router-dom";
 import { AsyncState } from "../../components/async-state/async-state";
+import { ApprovalFlowPanel } from "../../components/approval-flow/approval-flow-panel";
 import { useAsync } from "../../hooks/use-async";
 import { requestService } from "../../lib/api/request-service";
 import { getErrorMessage } from "../../lib/api/http-client";
@@ -53,7 +54,8 @@ function statusColor(
   status: string,
 ): "default" | "primary" | "success" | "warning" | "error" {
   const normalized = status.toLowerCase();
-  if (normalized.includes("envi") || normalized.includes("concl")) return "success";
+  if (normalized === "em_aprovacao") return "primary";
+  if (normalized === "aprovado" || normalized.includes("envi") || normalized.includes("concl")) return "success";
   if (normalized.includes("reje") || normalized.includes("cancel")) return "error";
   if (normalized.includes("analis") || normalized.includes("progress")) return "primary";
   if (normalized.includes("pend") || normalized.includes("rascunho")) return "warning";
@@ -116,7 +118,7 @@ export function SubmissionDetailsPage() {
             {data?.template.name ?? "Detalhes do requerimento"}
           </Typography>
           <Typography variant="body1" className="submission-details__subtitle">
-            Consulta somente leitura do requerimento preenchido.
+            Consulte as respostas e acompanhe as etapas de aprovação.
           </Typography>
         </div>
       </div>
@@ -125,6 +127,7 @@ export function SubmissionDetailsPage() {
 
       {data && !loading && !error && (
         <div className="submission-details__content">
+          <ApprovalFlowPanel submissionId={data.submission.id} onChange={() => void reload()} />
           <Card className="submission-details__card" elevation={0}>
             <CardContent>
               <div className="submission-details__summary">
@@ -165,17 +168,19 @@ export function SubmissionDetailsPage() {
             <CardContent className="submission-details__form-content">
               <Typography variant="h6">Respostas do requerimento</Typography>
               <div className="submission-details__fields">
-                {data.template.fields.map((field) => (
+                {data.submission.answers.map((answer) => {
+                  const field = data.template.fields.find(item => item.campoId === answer.campoId);
+                  return (
                   <TextField
-                    key={field.campoId}
-                    label={field.label}
-                    value={formatValue(data.submission.data[field.campoId], field)}
-                    multiline={field.type === "textarea"}
-                    minRows={field.type === "textarea" ? 3 : undefined}
+                    key={answer.campoId}
+                    label={answer.label}
+                    value={field ? formatValue(answer.value, field) : String(answer.value ?? "Não informado")}
+                    multiline={field?.type === "textarea"}
+                    minRows={field?.type === "textarea" ? 3 : undefined}
                     fullWidth
                     disabled
                   />
-                ))}
+                ); })}
               </div>
             </CardContent>
           </Card>

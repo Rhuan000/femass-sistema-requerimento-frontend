@@ -18,6 +18,7 @@ import {
 } from "@mui/material";
 import { ChevronDown, FileText, Plus, Trash2 } from "lucide-react";
 import { AsyncState } from "../../components/async-state/async-state";
+import { ApprovalFlowEditor } from "../../components/approval-flow/approval-flow-editor";
 import { TemplateStatusChip } from "../../components/template-status-chip/template-status-chip";
 import { useAsync } from "../../hooks/use-async";
 import { getErrorMessage, getFieldErrors } from "../../lib/api/http-client";
@@ -99,6 +100,7 @@ function TemplateBuilderPage() {
         name: loadedTemplate.name,
         description: loadedTemplate.description,
         category: loadedTemplate.category,
+        approvalFlow: loadedTemplate.approvalFlow ?? [],
         fields: [],
       });
       const editableFields = loadedTemplate.fields.map((field) => ({
@@ -298,6 +300,8 @@ function TemplateBuilderPage() {
 
       <div className="template-builder__layout">
         <div className="template-builder__main">
+          <ApprovalFlowEditor value={template.approvalFlow ?? []} disabled={readOnly || saving}
+            onChange={approvalFlow => setTemplate(current => ({ ...current, approvalFlow }))} />
           <Card className="template-builder__card" elevation={0}>
             <CardContent className="template-builder__card-content">
               <Typography variant="h6">Informações gerais</Typography>

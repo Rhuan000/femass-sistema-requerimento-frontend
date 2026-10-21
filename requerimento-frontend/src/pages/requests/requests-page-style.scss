@@ -334,7 +334,12 @@
   .MuiCardContent-root {
     display: flex;
     flex-direction: column;
-    gap: 18px;
+    gap: 20px;
+    padding: 24px;
+
+    &:last-child { padding-bottom: 20px; }
+
+    @media (max-width: 639px) { padding: 18px; }
   }
 }
 
@@ -343,12 +348,52 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
+
+  > div { min-width: 0; }
+
+  @media (max-width: 480px) { flex-wrap: wrap; }
+}
+
+.requests-list__submission-title.MuiTypography-root {
+  font-size: 20px;
+  line-height: 1.3;
+  font-weight: 700;
+  color: $color-text;
+  overflow-wrap: anywhere;
+}
+
+.requests-list__protocol {
+  margin: 7px 0 0;
+  color: $color-text-light;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+
+  span { margin-left: 6px; font-family: monospace; }
+}
+
+.requests-list__submission-status.MuiChip-root {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.requests-list__submission-footer {
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid $color-border;
+  padding-top: 16px;
+
+  .MuiButton-root { text-transform: none; padding: 8px 16px; border-radius: 8px; }
+
+  @media (max-width: 480px) { .MuiButton-root { width: 100%; } }
 }
 
 .requests-list__metadata {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: minmax(0, 320px) minmax(0, 240px);
+  gap: 12px 32px;
 
   div {
     display: flex;
@@ -361,6 +406,8 @@
     font-size: 12px;
   }
 
+  strong { font-size: 14px; font-weight: 500; overflow-wrap: anywhere; }
+
   @media (max-width: 639px) {
     grid-template-columns: 1fr;
   }
@@ -370,6 +417,23 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+  background: #f7f9fc;
+  border: 1px solid #eaf0f6;
+  border-radius: 10px;
+  padding: 16px;
+}
+
+.requests-list__section-title.MuiTypography-root {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  color: $color-text-light;
+}
+
+.requests-list__no-answers {
+  font-size: 14px;
+  color: $color-text-light;
 }
 
 .requests-list__answers {
@@ -379,19 +443,21 @@
 
   div {
     display: grid;
-    grid-template-columns: minmax(130px, 0.35fr) minmax(0, 1fr);
-    gap: 12px;
+    grid-template-columns: minmax(130px, 220px) minmax(0, 1fr);
+    gap: 16px;
+    font-size: 14px;
+    line-height: 1.6;
   }
 
   dt {
-    font-weight: 600;
+    font-weight: 500;
     overflow-wrap: anywhere;
   }
 
   dd {
     margin: 0;
     overflow-wrap: anywhere;
-    color: $color-text-light;
+    color: $color-text;
   }
 
   @media (max-width: 639px) {

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Paperclip, Send, Trash2 } from "lucide-react";
 import {
@@ -79,6 +79,9 @@ export function RequestFormPage() {
   /** Erros por campo devolvidos pelo backend; a chave é o campoId (fieldKey). */
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const uploadQueue = useRef(Promise.resolve());
+  const saveQueue = useRef(Promise.resolve());
+  const sending = useRef(false);
+  const draftRequest = useRef<{ key: string; promise: Promise<Submission> } | null>(null);
   // Permissões calculadas pelo backend para o usuário atual.
   const canEdit = Boolean(submission?.canEdit);
   const canSubmit = Boolean(submission?.canSubmit);
@@ -88,29 +91,28 @@ export function RequestFormPage() {
     if (!template) return;
 
     let cancelled = false;
-    setDraftReady(false);
-    setSubmitError(null);
 
     const loadOrCreateDraft = async () => {
+      await Promise.resolve();
+      if (cancelled) return;
+      setDraftReady(false);
+      setSubmitError(null);
       try {
-        let draft: Submission;
-
-        if (submissionId) {
-          draft = await requestService.getSubmission(submissionId);
-        } else {
-          try {
-            draft = await requestService.getDraftByTemplate(template.id);
-          } catch (requestError) {
-            if (!(requestError instanceof ApiError) || requestError.status !== 404) {
-              throw requestError;
-            }
-
-            draft = await requestService.createSubmission({
-              templateId: template.id,
-              data: {},
-            });
-          }
+        const key = `${template.id}:${submissionId ?? "new"}`;
+        if (draftRequest.current?.key !== key) {
+          const promise = submissionId
+            ? requestService.getSubmission(submissionId)
+            : requestService.getDraftByTemplate(template.id).catch(requestError => {
+                if (!(requestError instanceof ApiError) || requestError.status !== 404) throw requestError;
+                return requestService.createSubmission({ templateId: template.id, data: {} });
+              });
+          draftRequest.current = { key, promise };
+          // Permite uma nova tentativa após erro, sem duplicar a operação em StrictMode.
+          void promise.catch(() => {
+            if (draftRequest.current?.promise === promise) draftRequest.current = null;
+          });
         }
+        const draft = await draftRequest.current.promise;
 
         if (cancelled) return;
 
@@ -150,37 +152,35 @@ export function RequestFormPage() {
     });
   };
 
-  const saveDraft = async () => {
-    if (!template || !submission?.canEdit) {
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const result = await requestService.updateSubmission(
-        submission.id,
-        toSubmissionData(template.fields, formData),
-      );
-      setSubmission((current) => (current ? { ...current, ...result } : result));
-    } catch (requestError) {
-      setSubmitError(getErrorMessage(requestError));
-      throw requestError;
-    } finally {
-      setSaving(false);
-    }
-  };
+  const draftId = submission?.id;
+  const saveDraft = useCallback(() => {
+    if (!template || !draftId || !canEdit) return Promise.resolve();
+    const data = toSubmissionData(template.fields, formData);
+    const task = saveQueue.current.then(async () => {
+      setSaving(true);
+      try {
+        const result = await requestService.updateSubmission(draftId, data);
+        setSubmission(current => current?.id === draftId ? { ...current, ...result } : current);
+      } catch (requestError) {
+        setSubmitError(getErrorMessage(requestError));
+        throw requestError;
+      } finally { setSaving(false); }
+    });
+    saveQueue.current = task.catch(() => undefined);
+    return task;
+  }, [template, draftId, canEdit, formData]);
 
   useEffect(() => {
-    if (!draftReady || !submission?.canEdit) {
+    if (!draftReady || !canEdit || submitting) {
       return;
     }
 
     const timeout = window.setTimeout(() => {
-      void saveDraft().catch(() => undefined);
+      if (!sending.current) void saveDraft().catch(() => undefined);
     }, 700);
 
     return () => window.clearTimeout(timeout);
-  }, [draftReady, formData]);
+  }, [draftReady, canEdit, submitting, saveDraft]);
 
   const handleFiles = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
@@ -215,8 +215,9 @@ export function RequestFormPage() {
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!template) return;
+    if (!template || !submission || !canSubmit || !draftReady || sending.current) return;
 
+    sending.current = true;
     setSubmitting(true);
     setSubmitError(null);
     setFieldErrors({});
@@ -224,12 +225,13 @@ export function RequestFormPage() {
     try {
       await uploadQueue.current;
       await saveDraft();
-      const result = await requestService.submitSubmission(submission!.id);
+      const result = await requestService.submitSubmission(submission.id);
       setSubmission((current) => (current ? { ...current, ...result } : result));
     } catch (requestError) {
       setSubmitError(getErrorMessage(requestError));
       setFieldErrors(getFieldErrors(requestError));
     } finally {
+      sending.current = false;
       setSubmitting(false);
     }
   };
@@ -314,7 +316,7 @@ export function RequestFormPage() {
                         placeholder={field.placeholder}
                         required={field.required}
                         error={Boolean(fieldErrors[field.campoId])}
-                        disabled={!canEdit}
+                        disabled={!canEdit || submitting}
                         fullWidth
                       />
                     ) : field.type === "select" ? (
@@ -334,7 +336,7 @@ export function RequestFormPage() {
                           onChange={(event) =>
                             updateField(field.campoId, event.target.value)
                           }
-                          disabled={!canEdit}
+                          disabled={!canEdit || submitting}
                         >
                           {(field.options ?? []).map((option, optionIndex) => (
                             <MenuItem
@@ -357,7 +359,7 @@ export function RequestFormPage() {
                         placeholder={field.placeholder}
                         required={field.required}
                         error={Boolean(fieldErrors[field.campoId])}
-                        disabled={!canEdit}
+                        disabled={!canEdit || submitting}
                         fullWidth
                         slotProps={
                           field.type === "number"
@@ -396,7 +398,7 @@ export function RequestFormPage() {
                   </Typography>
                 </div>
                 {canEdit && (
-                  <Button component="label" variant="outlined" startIcon={<Paperclip size={16} />}>
+                  <Button component="label" variant="outlined" disabled={submitting} startIcon={<Paperclip size={16} />}>
                     Anexar documentos
                     <input
                       hidden
@@ -417,7 +419,7 @@ export function RequestFormPage() {
                           color="error"
                           size="small"
                           onClick={() => handleDeleteDocument(document.id)}
-                          disabled={!canEdit}
+                          disabled={!canEdit || submitting}
                           aria-label={`Excluir ${document.nomeOriginal}`}
                         >
                           <Trash2 size={16} />

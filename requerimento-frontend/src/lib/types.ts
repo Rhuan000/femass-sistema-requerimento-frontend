@@ -75,6 +75,7 @@ export interface Template {
   active: boolean;
   fields: TemplateField[];
   /** Ações que o usuário atual pode executar, calculadas pelo backend. */
+  approvalFlow?: ApprovalRule[];
   availableActions: TemplateAction[];
   createdAt?: string;
   updatedAt?: string;
@@ -110,6 +111,27 @@ export interface TemplateInput {
   description: string;
   category: string;
   fields: TemplateField[];
+  approvalFlow?: ApprovalRule[];
+}
+
+export interface ApprovalRule {
+  label: string;
+  role: string | null;
+  userId: string | null;
+  priority: number;
+}
+
+export interface ApprovalPerson { id: string; name: string; roles: string[] }
+export interface ApprovalStep extends ApprovalRule {
+  id: string; position: number; version: number; status: string;
+  decidedAt?: string; decidedBy?: string; reason?: string;
+}
+export interface ApprovalFlow {
+  steps: Array<{ step: ApprovalStep; responsibleName: string; canDecide: boolean; canReassign: boolean }>;
+  history: Array<{ id: string; action: string; actorName: string; description: string; createdAt: string }>;
+}
+export interface ApprovalNotification {
+  id: string; submissionId: string; templateId: string; message: string; createdAt: string; readAt?: string;
 }
 
 export interface Submission {
