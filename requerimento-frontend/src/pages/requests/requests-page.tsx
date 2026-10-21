@@ -15,7 +15,6 @@ import {
 } from "@mui/material";
 import { AsyncState } from "../../components/async-state/async-state";
 import { useAsync } from "../../hooks/use-async";
-import { useTemplates } from "../../hooks/use-templates";
 import { requestService } from "../../lib/api/request-service";
 import type { Submission } from "../../lib/types";
 import "./requests-page-style.scss";
@@ -59,12 +58,8 @@ function Answers({ submission }: { submission: Submission }) {
 
 export function RequestsPage() {
   const navigate = useNavigate();
-  const { data: templates, loading: loadingTemplates, error: templatesError, reload } =
-    useTemplates();
   const [templateId, setTemplateId] = useState("");
   const [search, setSearch] = useState("");
-
-  const selectedTemplateId = templateId || templates?.[0]?.id || "";
 
   const {
     data: submissions,
@@ -72,32 +67,38 @@ export function RequestsPage() {
     error: submissionsError,
     reload: reloadSubmissions,
   } = useAsync(
-    () =>
-      selectedTemplateId
-        ? requestService.listSubmissionsByTemplate(selectedTemplateId)
-        : Promise.resolve([]),
-    selectedTemplateId,
+    () => requestService.listSubmissions(),
   );
+
+  const templates = useMemo(() => {
+    const options = new Map<string, string>();
+    for (const submission of submissions ?? []) {
+      options.set(submission.templateId, submission.templateName || submission.templateId);
+    }
+    return Array.from(options, ([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+  }, [submissions]);
 
   const filtered = useMemo(() => {
     const query = search.toLocaleLowerCase("pt-BR").trim();
     return (submissions ?? []).filter(
       (submission) => {
+        if (templateId && submission.templateId !== templateId) return false;
         const searchable = [
           submission.id,
           submission.submittedBy,
           submission.status,
+          submission.templateName,
         ]
           .map((value) => String(value ?? "").toLocaleLowerCase("pt-BR"))
           .join(" ");
         return searchable.includes(query);
       },
     );
-  }, [search, submissions]);
+  }, [search, submissions, templateId]);
 
-  const loading =
-    loadingTemplates || (Boolean(selectedTemplateId) && loadingSubmissions);
-  const error = templatesError || submissionsError;
+  const loading = loadingSubmissions;
+  const error = submissionsError;
 
   return (
     <div className="requests-list">
@@ -106,20 +107,23 @@ export function RequestsPage() {
           Consulta de envios
         </Typography>
         <Typography variant="body1" className="requests-list__subtitle">
-          Selecione um template para consultar os requerimentos recebidos.
+          Consulte os requerimentos recebidos ou filtre por template.
         </Typography>
       </div>
 
-      {!loadingTemplates && !templatesError && (
+      {!loading && !error && (
         <div className="requests-list__filters">
           <FormControl className="requests-list__template-select">
-            <InputLabel id="template-filter-label">Template</InputLabel>
+            <InputLabel id="template-filter-label" shrink>Template</InputLabel>
             <Select
               labelId="template-filter-label"
-              value={selectedTemplateId}
+              value={templateId}
+              displayEmpty
+              notched
               label="Template"
               onChange={(event) => setTemplateId(event.target.value)}
             >
+              <MenuItem value="">Todos os templates</MenuItem>
               {(templates ?? []).map((template) => (
                 <MenuItem key={template.id} value={template.id}>
                   {template.name}
@@ -131,7 +135,7 @@ export function RequestsPage() {
             className="requests-list__search"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Buscar por ID, usuário ou status"
+            placeholder="Buscar por ID, usuário, status ou template"
             slotProps={{
               input: {
                 startAdornment: <Search size={18} className="requests-list__search-icon" />,
@@ -144,15 +148,17 @@ export function RequestsPage() {
       <AsyncState
         loading={loading}
         error={error}
-        onRetry={templatesError ? reload : reloadSubmissions}
+        onRetry={reloadSubmissions}
         empty={!loading && !error && filtered.length === 0}
         emptyTitle={
-          templates?.length === 0 ? "Nenhum template cadastrado" : "Nenhum envio encontrado"
+          "Nenhum envio encontrado"
         }
         emptyDescription={
           search
             ? "Ajuste o termo de busca."
-            : "Este template ainda não possui envios."
+            : templateId
+              ? "Este template ainda não possui envios."
+              : "Ainda não há envios para consultar."
         }
       />
 
@@ -175,6 +181,10 @@ export function RequestsPage() {
                   />
                 </div>
                 <div className="requests-list__metadata">
+                  <div>
+                    <span>Template</span>
+                    <strong>{submission.templateName || submission.templateId}</strong>
+                  </div>
                   <div>
                     <span>Usuário</span>
                     <strong>{submission.submittedBy || "Usuário autenticado"}</strong>

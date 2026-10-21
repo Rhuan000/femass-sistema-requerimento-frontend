@@ -247,6 +247,11 @@ export const requestService = {
     return unwrapList<Submission>(payload).map(normalizeSubmission);
   },
 
+  async listSubmissions() {
+    const payload = await apiRequest<unknown>("/submissions");
+    return unwrapList<Submission>(payload).map(normalizeSubmission);
+  },
+
   async getSubmission(id: string) {
     const payload = await apiRequest<unknown>(`/submissions/${id}`);
     return normalizeSubmission(unwrapObject<Submission>(payload));

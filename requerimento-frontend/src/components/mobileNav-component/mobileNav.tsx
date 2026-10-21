@@ -44,7 +44,7 @@ export function MobileNav() {
             <NavLink
               key={item.path}
               to={item.path}
-              end={item.path === "/"}
+              end={item.path === "/" || item.path === "/templates"}
               className={({ isActive }) =>
                 `mobile-nav__link ${isActive ? "mobile-nav__link--active" : ""}`
               }

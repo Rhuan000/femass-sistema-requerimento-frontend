@@ -36,7 +36,7 @@ export function Sidebar() {
               <NavLink
                 key={item.path}
                 to={item.path}
-                end={item.path === "/"}
+                end={item.path === "/" || item.path === "/templates"}
                 className={({ isActive }) =>
                   `app-sidebar__link ${isActive ? "app-sidebar__link--active" : ""}`
                 }
